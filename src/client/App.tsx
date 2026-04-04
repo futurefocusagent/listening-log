@@ -9,6 +9,7 @@ interface AlbumStat {
   percentage: number
   complete: boolean
   imageUrl?: string
+  spotifyId?: string
 }
 
 interface ApiResponse {
@@ -280,6 +281,17 @@ function AlbumCard({ album }: { album: AlbumStat }) {
           <div style={{ color: '#555', fontSize: 12 }}>tracks</div>
         </div>
 
+        <a
+          href={album.spotifyId
+            ? `spotify:album:${album.spotifyId}`
+            : `spotify:search:${encodeURIComponent(`${album.artist} ${album.album}`)}`
+          }
+          title="Open in Spotify"
+          onClick={e => e.stopPropagation()}
+          style={{ fontSize: 18, textDecoration: 'none', flexShrink: 0 }}
+        >
+          🎧
+        </a>
         <span style={{ color: '#444', fontSize: 12 }}>{expanded ? '▲' : '▼'}</span>
       </div>
 
