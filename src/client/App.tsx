@@ -14,6 +14,8 @@ interface AlbumStat {
 
 interface ApiResponse {
   loading: boolean
+  status: string
+  progress: string
   stats: AlbumStat[]
   totalTracks: number
   fetchedAt: string | null
@@ -111,6 +113,20 @@ export default function App() {
               {refreshing ? 'Refreshing…' : '↻ Refresh'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {data?.status === 'error' && (
+        <div style={{
+          background: '#1a1a1a', border: '1px solid #3a1a1a', borderRadius: 10,
+          padding: 24, textAlign: 'center', marginBottom: 24, color: '#f87171'
+        }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
+          <p style={{ fontWeight: 600 }}>Something went wrong</p>
+          <p style={{ fontSize: 13, marginTop: 4, color: '#888' }}>
+            {data.progress || 'Database unavailable. Please try again later.'}
+          </p>
         </div>
       )}
 

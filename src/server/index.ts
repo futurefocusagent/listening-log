@@ -125,14 +125,20 @@ async function boot() {
     await initDb()
   } catch (err) {
     console.error('DB init failed:', err)
+    state.status = 'error'
+    state.progress = 'Database unavailable. Please try again later.'
+    return
   }
 
-  // Load cached data from DB immediately (instant response on wake)
+  // Load cached data from DB
   let cached = null
   try {
     cached = await loadStats()
   } catch (err) {
-    console.error('DB load failed, will sync from Last.fm:', err)
+    console.error('DB load failed:', err)
+    state.status = 'error'
+    state.progress = 'Could not load data from database. Please try again later.'
+    return
   }
 
   if (cached) {
@@ -144,10 +150,14 @@ async function boot() {
     console.log(`Loaded ${state.stats.length} albums from DB (cached ${cached.fetchedAt})`)
   }
 
-  // Sync in background if stale or empty — always silent if we have data
+  // DB empty = first ever run, sync from Last.fm
+  // DB stale = background re-sync (silent, data already shown)
   const stale = Date.now() - lastSync > SYNC_INTERVAL_MS
-  if (!cached || stale) {
-    console.log(cached ? 'Cache stale, background syncing...' : 'No cache, syncing from Last.fm...')
+  if (!cached) {
+    console.log('DB empty — first run, syncing from Last.fm...')
+    doRefresh(true)
+  } else if (stale) {
+    console.log('Data stale, background syncing...')
     doRefresh(true)
   }
 
