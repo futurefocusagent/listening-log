@@ -121,10 +121,20 @@ async function doRefresh(force = false) {
 
 async function boot() {
   // Init DB schema
-  await initDb()
+  try {
+    await initDb()
+  } catch (err) {
+    console.error('DB init failed:', err)
+  }
 
   // Load cached data from DB immediately (instant response on wake)
-  const cached = await loadStats()
+  let cached = null
+  try {
+    cached = await loadStats()
+  } catch (err) {
+    console.error('DB load failed, will sync from Last.fm:', err)
+  }
+
   if (cached) {
     state.stats = cached.stats
     state.totalTracks = cached.totalTracks
@@ -134,10 +144,10 @@ async function boot() {
     console.log(`Loaded ${state.stats.length} albums from DB (cached ${cached.fetchedAt})`)
   }
 
-  // Sync in background if stale or empty
+  // Sync in background if stale or empty — always silent if we have data
   const stale = Date.now() - lastSync > SYNC_INTERVAL_MS
   if (!cached || stale) {
-    console.log(cached ? 'Cache stale, syncing...' : 'No cache, syncing...')
+    console.log(cached ? 'Cache stale, background syncing...' : 'No cache, syncing from Last.fm...')
     doRefresh(true)
   }
 
