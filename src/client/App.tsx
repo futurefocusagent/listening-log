@@ -8,6 +8,7 @@ interface AlbumStat {
   listenedCount: number
   percentage: number
   complete: boolean
+  imageUrl?: string
 }
 
 interface ApiResponse {
@@ -217,21 +218,42 @@ function AlbumCard({ album }: { album: AlbumStat }) {
       onClick={() => setExpanded(e => !e)}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {/* Completion ring / badge */}
-        <div style={{
-          width: 48, height: 48, borderRadius: '50%',
-          background: `conic-gradient(${barColor} ${album.percentage}%, #2a2a2a ${album.percentage}%)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: '#1a1a1a',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, color: barColor,
-          }}>
-            {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
-          </div>
+        {/* Album art or completion ring */}
+        <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
+          {album.imageUrl ? (
+            <img
+              src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
+              alt={album.album}
+              style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', display: 'block' }}
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+          ) : (
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: `conic-gradient(${barColor} ${album.percentage}%, #2a2a2a ${album.percentage}%)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%',
+                background: '#1a1a1a',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 700, color: barColor,
+              }}>
+                {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
+              </div>
+            </div>
+          )}
+          {/* Percentage badge over image */}
+          {album.imageUrl && (
+            <div style={{
+              position: 'absolute', bottom: -4, right: -4,
+              background: barColor, color: '#000',
+              borderRadius: 4, fontSize: 10, fontWeight: 700,
+              padding: '1px 4px', lineHeight: 1.4,
+            }}>
+              {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
+            </div>
+          )}
         </div>
 
         {/* Info */}

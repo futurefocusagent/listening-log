@@ -16,6 +16,7 @@ export interface AlbumStat {
   listenedCount: number
   percentage: number
   complete: boolean
+  imageUrl?: string
 }
 
 async function lfmGet(params: Record<string, string>): Promise<unknown> {
@@ -104,6 +105,7 @@ export async function getAlbumInfo(artist: string, album: string): Promise<{
   artist: string
   totalTracks: number
   tracks: string[]
+  imageUrl?: string
 } | null> {
   try {
     const data = (await lfmGet({
@@ -114,6 +116,7 @@ export async function getAlbumInfo(artist: string, album: string): Promise<{
       album?: {
         name: string
         artist: string
+        image?: Array<{ '#text': string; size: string }>
         tracks?: { track: Array<{ name: string }> | { name: string } }
       }
       error?: number
@@ -125,11 +128,21 @@ export async function getAlbumInfo(artist: string, album: string): Promise<{
     const trackList = Array.isArray(raw) ? raw : [raw]
     if (!trackList.length) return null
 
+    // Pick largest available image
+    const images = data.album.image ?? []
+    const preferred = ['extralarge', 'large', 'medium', 'small']
+    let imageUrl: string | undefined
+    for (const size of preferred) {
+      const img = images.find(i => i.size === size)
+      if (img?.['#text']) { imageUrl = img['#text']; break }
+    }
+
     return {
       name: data.album.name,
       artist: data.album.artist,
       totalTracks: trackList.length,
       tracks: trackList.map(t => t.name.toLowerCase()),
+      imageUrl,
     }
   } catch {
     return null

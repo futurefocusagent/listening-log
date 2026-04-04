@@ -76,6 +76,7 @@ async function doRefresh(force = false) {
           listenedCount: listenedSet.size,
           percentage: 0,
           complete: false,
+          imageUrl: info?.imageUrl,
         }
       } else {
         const matchedCount = info.tracks.filter(t => listenedSet.has(t)).length
@@ -89,6 +90,7 @@ async function doRefresh(force = false) {
           listenedCount,
           percentage,
           complete: listenedCount >= info.totalTracks,
+          imageUrl: info.imageUrl,
         }
       }
 
@@ -152,6 +154,41 @@ app.get('/api/stats', (_req, res) => {
     totalTracks: state.totalTracks,
     fetchedAt: state.fetchedAt,
   })
+})
+
+// Proxy album art — avoids hotlinking, caches in memory
+const artCache = new Map<string, { data: Buffer; contentType: string }>()
+app.get('/api/albumart', async (req, res) => {
+  const { artist, album } = req.query as { artist?: string; album?: string }
+  if (!artist || !album) return res.status(400).send('missing params')
+
+  const key = `${artist}|||${album}`
+  if (artCache.has(key)) {
+    const cached = artCache.get(key)!
+    res.set('Content-Type', cached.contentType)
+    res.set('Cache-Control', 'public, max-age=86400')
+    return res.send(cached.data)
+  }
+
+  // Find the imageUrl from state
+  const stat = state.stats.find(
+    s => s.artist.toLowerCase() === artist.toLowerCase() &&
+         s.album.toLowerCase() === album.toLowerCase()
+  )
+  if (!stat?.imageUrl) return res.status(404).send('no image')
+
+  try {
+    const upstream = await fetch(stat.imageUrl)
+    if (!upstream.ok) return res.status(404).send('upstream failed')
+    const contentType = upstream.headers.get('content-type') || 'image/jpeg'
+    const data = Buffer.from(await upstream.arrayBuffer())
+    artCache.set(key, { data, contentType })
+    res.set('Content-Type', contentType)
+    res.set('Cache-Control', 'public, max-age=86400')
+    return res.send(data)
+  } catch {
+    return res.status(500).send('fetch failed')
+  }
 })
 
 app.post('/api/refresh', (_req, res) => {
