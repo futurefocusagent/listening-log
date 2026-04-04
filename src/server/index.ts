@@ -1,10 +1,12 @@
 import express from 'express'
 import path from 'path'
 import { getAllTracks, getAlbumInfo, AlbumStat } from './lastfm'
+import { initDb, saveStats, loadStats } from './db'
 
 const app = express()
 const PORT = process.env.PORT || 3000
 const LASTFM_USER = process.env.LASTFM_USER || 'boytunewonder'
+const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000 // re-sync every 6 hours
 
 app.use(express.json())
 
@@ -25,18 +27,18 @@ const state: State = {
 }
 
 let refreshLock = false
+let lastSync = 0
 
-async function doRefresh() {
+async function doRefresh(force = false) {
   if (refreshLock) return
+  if (!force && Date.now() - lastSync < SYNC_INTERVAL_MS) return
   refreshLock = true
   try {
     state.status = 'fetching-tracks'
-    state.stats = []
     state.progress = 'Fetching scrobbles...'
-    console.log('Fetching tracks for', LASTFM_USER)
+    console.log('Syncing Last.fm data for', LASTFM_USER)
 
-    const yearsBack = 10
-    const fromTs = Math.floor(Date.now() / 1000) - yearsBack * 365 * 24 * 60 * 60
+    const fromTs = Math.floor(Date.now() / 1000) - 10 * 365 * 24 * 60 * 60
     const tracks = await getAllTracks(LASTFM_USER, fromTs, (page, total) => {
       state.progress = `Fetching scrobbles: page ${page}/${total}`
     })
@@ -52,7 +54,7 @@ async function doRefresh() {
     }
 
     const albumEntries = Array.from(albumMap.entries())
-    console.log(`${albumEntries.length} unique albums, fetching track counts...`)
+    console.log(`${albumEntries.length} unique albums — looking up track counts`)
     state.status = 'fetching-albums'
 
     let done = 0
@@ -88,7 +90,6 @@ async function doRefresh() {
         }
       }
 
-      // Insert sorted: incomplete by % desc, then complete
       state.stats.push(stat)
       state.stats.sort((a, b) => {
         if (a.complete !== b.complete) return a.complete ? 1 : -1
@@ -98,21 +99,47 @@ async function doRefresh() {
       })
     }
 
+    // Persist to DB
+    await saveStats(state.stats, state.totalTracks)
+    lastSync = Date.now()
     state.status = 'done'
     state.fetchedAt = new Date().toISOString()
     state.progress = ''
-    console.log('Done!')
+    console.log('Sync complete —', state.stats.length, 'albums saved to DB')
   } catch (err) {
     state.status = 'error'
     state.progress = String(err)
-    console.error('Error:', err)
+    console.error('Sync error:', err)
   } finally {
     refreshLock = false
   }
 }
 
-// Start on boot
-doRefresh()
+async function boot() {
+  // Init DB schema
+  await initDb()
+
+  // Load cached data from DB immediately (instant response on wake)
+  const cached = await loadStats()
+  if (cached) {
+    state.stats = cached.stats
+    state.totalTracks = cached.totalTracks
+    state.fetchedAt = cached.fetchedAt
+    state.status = 'done'
+    lastSync = cached.fetchedAt ? new Date(cached.fetchedAt).getTime() : 0
+    console.log(`Loaded ${state.stats.length} albums from DB (cached ${cached.fetchedAt})`)
+  }
+
+  // Sync in background if stale or empty
+  const stale = Date.now() - lastSync > SYNC_INTERVAL_MS
+  if (!cached || stale) {
+    console.log(cached ? 'Cache stale, syncing...' : 'No cache, syncing...')
+    doRefresh(true)
+  }
+
+  // Schedule periodic re-sync
+  setInterval(() => doRefresh(), SYNC_INTERVAL_MS)
+}
 
 app.get('/api/stats', (_req, res) => {
   res.json({
@@ -126,23 +153,19 @@ app.get('/api/stats', (_req, res) => {
 })
 
 app.post('/api/refresh', (_req, res) => {
-  if (!refreshLock) doRefresh()
+  doRefresh(true)
   res.json({ ok: true })
 })
 
 const clientDist = path.join(__dirname, '../client')
-console.log('Serving client from:', clientDist)
 app.use(express.static(clientDist))
 app.get('*', (_req, res) => {
-  const indexPath = path.join(clientDist, 'index.html')
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      console.error('Failed to serve index.html:', err.message, 'path:', indexPath)
-      res.status(500).send('Client not found. Path: ' + indexPath)
-    }
+  res.sendFile(path.join(clientDist, 'index.html'), err => {
+    if (err) res.status(500).send('Client not found')
   })
 })
 
 app.listen(PORT, () => {
-  console.log(`Listening Log server on port ${PORT}`)
+  console.log(`Listening Log on port ${PORT}`)
+  boot()
 })
