@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import express from 'express'
 import path from 'path'
 import { getAllTracks, getAlbumInfo, AlbumStat } from './lastfm'
@@ -33,8 +34,9 @@ async function doRefresh(force = false) {
   if (refreshLock) return
   if (!force && Date.now() - lastSync < SYNC_INTERVAL_MS) return
   refreshLock = true
+  const hasExistingData = state.stats.length > 0
   try {
-    state.status = 'fetching-tracks'
+    if (!hasExistingData) state.status = 'fetching-tracks'
     state.progress = 'Fetching scrobbles...'
     console.log('Syncing Last.fm data for', LASTFM_USER)
 
@@ -55,7 +57,7 @@ async function doRefresh(force = false) {
 
     const albumEntries = Array.from(albumMap.entries())
     console.log(`${albumEntries.length} unique albums — looking up track counts`)
-    state.status = 'fetching-albums'
+    if (!hasExistingData) state.status = 'fetching-albums'
 
     let done = 0
     for (const [, { artist, album, tracks: listenedSet }] of albumEntries) {

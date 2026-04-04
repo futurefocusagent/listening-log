@@ -1,11 +1,11 @@
 import { Pool } from 'pg'
 import { AlbumStat } from './lastfm'
 
-// Internal Render connections don't need SSL; external ones do
-const isExternal = process.env.DATABASE_URL?.includes('oregon-postgres.render.com')
+// Render internal URLs use the short hostname (no domain); external ones have oregon-postgres.render.com
+const isInternal = process.env.DATABASE_URL?.match(/@dpg-[^.]+\//) !== null
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: isExternal ? { rejectUnauthorized: false } : false,
+  ssl: isInternal ? false : { rejectUnauthorized: false },
 })
 
 export async function initDb() {

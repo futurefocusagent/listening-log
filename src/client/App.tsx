@@ -119,9 +119,9 @@ export default function App() {
           marginBottom: 24, color: '#888'
         }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
-          <p>Fetching your listening history from Last.fm…</p>
+          <p>Building your listening history…</p>
           <p style={{ fontSize: 13, marginTop: 4, color: '#555' }}>
-            This can take a minute on first load
+            Fetching from Last.fm — this only happens once
           </p>
           {data.stats.length > 0 && (
             <p style={{ fontSize: 13, marginTop: 8, color: '#666' }}>
