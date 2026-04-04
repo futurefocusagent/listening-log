@@ -131,9 +131,16 @@ app.post('/api/refresh', (_req, res) => {
 })
 
 const clientDist = path.join(__dirname, '../client')
+console.log('Serving client from:', clientDist)
 app.use(express.static(clientDist))
 app.get('*', (_req, res) => {
-  res.sendFile(path.join(clientDist, 'index.html'))
+  const indexPath = path.join(clientDist, 'index.html')
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error('Failed to serve index.html:', err.message, 'path:', indexPath)
+      res.status(500).send('Client not found. Path: ' + indexPath)
+    }
+  })
 })
 
 app.listen(PORT, () => {
