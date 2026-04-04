@@ -2,7 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import path from 'path'
 import { getAllTracks, getAlbumInfo, AlbumStat } from './lastfm'
-import { initDb, saveStats, loadStats } from './db'
+import { initDb, saveStats, loadStats, updateImageUrl, getAlbumsMissingImages } from './db'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -119,6 +119,26 @@ async function doRefresh(force = false) {
   }
 }
 
+async function backfillImages() {
+  const missing = await getAlbumsMissingImages()
+  if (missing.length === 0) return
+  console.log(`Backfilling images for ${missing.length} albums...`)
+  for (const { artist, album } of missing) {
+    const info = await getAlbumInfo(artist, album)
+    if (info?.imageUrl) {
+      await updateImageUrl(artist, album, info.imageUrl)
+      // Update in-memory state so the proxy endpoint can serve it immediately
+      const stat = state.stats.find(
+        s => s.artist.toLowerCase() === artist.toLowerCase() &&
+             s.album.toLowerCase() === album.toLowerCase()
+      )
+      if (stat) stat.imageUrl = info.imageUrl
+    }
+    await new Promise(r => setTimeout(r, 150))
+  }
+  console.log('Image backfill complete')
+}
+
 async function boot() {
   // Init DB schema
   try {
@@ -159,6 +179,9 @@ async function boot() {
   } else if (stale) {
     console.log('Data stale, background syncing...')
     doRefresh(true)
+  } else {
+    // Backfill any missing album images in the background
+    backfillImages()
   }
 
   // Schedule periodic re-sync

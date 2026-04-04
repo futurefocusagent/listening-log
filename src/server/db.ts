@@ -10,9 +10,6 @@ const pool = new Pool({
 
 export async function initDb() {
   await pool.query(`
-    ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS image_url TEXT;
-  `).catch(() => {}) // ignore if already exists
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS album_stats (
       id SERIAL PRIMARY KEY,
       artist TEXT NOT NULL,
@@ -31,6 +28,8 @@ export async function initDb() {
       value TEXT NOT NULL
     );
   `)
+  // Add image_url column to existing tables that predate it
+  await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS image_url TEXT`)
   console.log('DB initialized')
 }
 
@@ -38,7 +37,7 @@ export async function saveStats(stats: AlbumStat[], totalTracks: number) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    await client.query('TRUNCATE album_stats')
+    // Upsert each album — never truncate, so a mid-sync crash doesn't wipe data
     for (const s of stats) {
       await client.query(
         `INSERT INTO album_stats
@@ -66,6 +65,20 @@ export async function saveStats(stats: AlbumStat[], totalTracks: number) {
   } finally {
     client.release()
   }
+}
+
+export async function updateImageUrl(artist: string, album: string, imageUrl: string) {
+  await pool.query(
+    `UPDATE album_stats SET image_url = $1 WHERE artist = $2 AND album = $3`,
+    [imageUrl, artist, album]
+  )
+}
+
+export async function getAlbumsMissingImages(): Promise<Array<{ artist: string; album: string }>> {
+  const result = await pool.query<{ artist: string; album: string }>(
+    `SELECT artist, album FROM album_stats WHERE image_url IS NULL ORDER BY artist`
+  )
+  return result.rows
 }
 
 export async function loadStats(): Promise<{
