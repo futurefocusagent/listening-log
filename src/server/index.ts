@@ -59,6 +59,7 @@ async function doRefresh(force = false) {
     console.log(`${albumEntries.length} unique albums — looking up track counts`)
     if (!hasExistingData) state.status = 'fetching-albums'
 
+    const newStats: AlbumStat[] = []
     let done = 0
     for (const [, { artist, album, tracks: listenedSet }] of albumEntries) {
       done++
@@ -93,15 +94,16 @@ async function doRefresh(force = false) {
           imageUrl: info.imageUrl,
         }
       }
-
-      state.stats.push(stat)
-      state.stats.sort((a, b) => {
-        if (a.complete !== b.complete) return a.complete ? 1 : -1
-        if (!a.totalTracks && b.totalTracks) return 1
-        if (!b.totalTracks && a.totalTracks) return -1
-        return b.percentage - a.percentage
-      })
+      newStats.push(stat)
     }
+
+    newStats.sort((a, b) => {
+      if (a.complete !== b.complete) return a.complete ? 1 : -1
+      if (!a.totalTracks && b.totalTracks) return 1
+      if (!b.totalTracks && a.totalTracks) return -1
+      return b.percentage - a.percentage
+    })
+    state.stats = newStats
 
     // Persist to DB
     await saveStats(state.stats, state.totalTracks)

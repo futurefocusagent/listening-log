@@ -37,7 +37,7 @@ export async function saveStats(stats: AlbumStat[], totalTracks: number) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    // Upsert each album — never truncate, so a mid-sync crash doesn't wipe data
+    // Upsert all current albums
     for (const s of stats) {
       await client.query(
         `INSERT INTO album_stats
@@ -53,6 +53,12 @@ export async function saveStats(stats: AlbumStat[], totalTracks: number) {
         [s.artist, s.album, s.totalTracks, s.listenedTracks, s.listenedCount, s.percentage, s.complete, s.imageUrl ?? null]
       )
     }
+    // Remove albums no longer in the current sync
+    const keys = stats.map(s => `${s.artist}|||${s.album}`)
+    await client.query(
+      `DELETE FROM album_stats WHERE (artist || '|||' || album) != ALL($1)`,
+      [keys]
+    )
     await client.query(
       `INSERT INTO sync_meta (key, value) VALUES ('last_sync', $1), ('total_tracks', $2)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
