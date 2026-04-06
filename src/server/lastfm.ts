@@ -18,7 +18,7 @@ export interface AlbumStat {
   complete: boolean
   imageUrl?: string
   spotifyId?: string
-  firstScrobbleYear?: number
+  releaseYear?: number
 }
 
 async function lfmGet(params: Record<string, string>): Promise<unknown> {

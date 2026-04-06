@@ -9,7 +9,7 @@ interface AlbumStat {
   percentage: number
   complete: boolean
   imageUrl?: string
-  firstScrobbleYear?: number
+  releaseYear?: number
 }
 
 interface Props {
@@ -21,7 +21,7 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
   // Group by year, most recent first
   const byYear = new Map<number, AlbumStat[]>()
   for (const s of stats) {
-    const year = s.firstScrobbleYear ?? 0
+    const year = s.releaseYear ?? 0
     if (!byYear.has(year)) byYear.set(year, [])
     byYear.get(year)!.push(s)
   }

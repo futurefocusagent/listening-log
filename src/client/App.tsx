@@ -12,7 +12,7 @@ interface AlbumStat {
   complete: boolean
   imageUrl?: string
   spotifyId?: string
-  firstScrobbleYear?: number
+  releaseYear?: number
 }
 
 interface ApiResponse {

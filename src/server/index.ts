@@ -2,7 +2,8 @@ import 'dotenv/config'
 import express from 'express'
 import path from 'path'
 import { getAllTracks, getAlbumInfo, AlbumStat } from './lastfm'
-import { initDb, saveStats, loadStats, updateImageUrl, getAlbumsMissingImages } from './db'
+import { initDb, saveStats, loadStats, updateImageUrl, getAlbumsMissingImages, updateReleaseYear, getAlbumsMissingYear } from './db'
+import { getReleaseYear } from './musicbrainz'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -48,14 +49,11 @@ async function doRefresh(force = false) {
     console.log(`Got ${tracks.length} tracks`)
 
     // Build album map
-    const albumMap = new Map<string, { artist: string; album: string; tracks: Set<string>; firstYear: number }>()
+    const albumMap = new Map<string, { artist: string; album: string; tracks: Set<string> }>()
     for (const t of tracks) {
       const key = `${t.artist.toLowerCase()}|||${t.album.toLowerCase()}`
-      const year = t.playedAt ? new Date(t.playedAt).getFullYear() : new Date().getFullYear()
-      if (!albumMap.has(key)) albumMap.set(key, { artist: t.artist, album: t.album, tracks: new Set(), firstYear: year })
-      const entry = albumMap.get(key)!
-      entry.tracks.add(t.name.toLowerCase())
-      if (year < entry.firstYear) entry.firstYear = year
+      if (!albumMap.has(key)) albumMap.set(key, { artist: t.artist, album: t.album, tracks: new Set() })
+      albumMap.get(key)!.tracks.add(t.name.toLowerCase())
     }
 
     const albumEntries = Array.from(albumMap.entries())
@@ -64,7 +62,7 @@ async function doRefresh(force = false) {
 
     const newStats: AlbumStat[] = []
     let done = 0
-    for (const [, { artist, album, tracks: listenedSet, firstYear }] of albumEntries) {
+    for (const [, { artist, album, tracks: listenedSet }] of albumEntries) {
       done++
       state.progress = `Looking up album info: ${done}/${albumEntries.length}`
 
@@ -81,7 +79,6 @@ async function doRefresh(force = false) {
           percentage: 0,
           complete: false,
           imageUrl: info?.imageUrl,
-          firstScrobbleYear: firstYear,
         }
       } else {
         const matchedCount = info.tracks.filter(t => listenedSet.has(t)).length
@@ -96,7 +93,6 @@ async function doRefresh(force = false) {
           percentage,
           complete: listenedCount >= info.totalTracks,
           imageUrl: info.imageUrl,
-          firstScrobbleYear: firstYear,
         }
       }
       newStats.push(stat)
@@ -124,6 +120,25 @@ async function doRefresh(force = false) {
   } finally {
     refreshLock = false
   }
+}
+
+async function backfillYears() {
+  const missing = await getAlbumsMissingYear()
+  if (missing.length === 0) return
+  console.log(`Backfilling release years for ${missing.length} albums via MusicBrainz...`)
+  for (const { artist, album } of missing) {
+    const year = await getReleaseYear(artist, album)
+    if (year) {
+      await updateReleaseYear(artist, album, year)
+      const stat = state.stats.find(
+        s => s.artist.toLowerCase() === artist.toLowerCase() &&
+             s.album.toLowerCase() === album.toLowerCase()
+      )
+      if (stat) stat.releaseYear = year
+    }
+    // MusicBrainz rate limit handled inside getReleaseYear
+  }
+  console.log('Year backfill complete')
 }
 
 async function backfillImages() {
@@ -187,8 +202,9 @@ async function boot() {
     console.log('Data stale, background syncing...')
     doRefresh(true)
   } else {
-    // Backfill any missing album images in the background
+    // Backfill missing images and release years in the background
     backfillImages()
+    backfillYears()
   }
 
   // Schedule periodic re-sync
