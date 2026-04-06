@@ -1,5 +1,5 @@
-import React, { useState, useRef, useMemo } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import React, { useState, useRef, useMemo, useEffect } from 'react'
+import { useWindowVirtualizer } from '@tanstack/react-virtual'
 
 interface AlbumStat {
   album: string
@@ -26,7 +26,7 @@ type Row =
   | { kind: 'tiles'; albums: AlbumStat[] }
 
 export default function Timeline({ stats, onAlbumClick }: Props) {
-  const parentRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   // Build flat row list: header + tile-rows per year
   const rows = useMemo<Row[]>(() => {
@@ -48,18 +48,15 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
     return result
   }, [stats])
 
-  const virtualiser = useVirtualizer({
+  const virtualiser = useWindowVirtualizer({
     count: rows.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: (i) => rows[i].kind === 'header' ? 52 : 0, // tiles are square, sized via CSS
+    estimateSize: (i) => rows[i].kind === 'header' ? 52 : 120,
     overscan: 5,
+    scrollMargin: listRef.current?.offsetTop ?? 0,
   })
 
   return (
-    <div
-      ref={parentRef}
-      style={{ height: '80vh', overflowY: 'auto', overflowX: 'hidden' }}
-    >
+    <div ref={listRef}>
       <div
         style={{
           height: virtualiser.getTotalSize(),
@@ -78,7 +75,7 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
                 top: 0,
                 left: 0,
                 width: '100%',
-                transform: `translateY(${vItem.start}px)`,
+                transform: `translateY(${vItem.start - virtualiser.options.scrollMargin}px)`,
               }}
             >
               {row.kind === 'header' ? (
