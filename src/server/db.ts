@@ -20,6 +20,7 @@ export async function initDb() {
       percentage INT NOT NULL DEFAULT 0,
       complete BOOLEAN NOT NULL DEFAULT FALSE,
       image_url TEXT,
+      first_scrobble_year INT,
       UNIQUE(artist, album)
     );
 
@@ -30,6 +31,7 @@ export async function initDb() {
   `)
   // Add image_url column to existing tables that predate it
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS image_url TEXT`)
+  await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS first_scrobble_year INT`)
   console.log('DB initialized')
 }
 
@@ -41,16 +43,17 @@ export async function saveStats(stats: AlbumStat[], totalTracks: number) {
     for (const s of stats) {
       await client.query(
         `INSERT INTO album_stats
-          (artist, album, total_tracks, listened_tracks, listened_count, percentage, complete, image_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          (artist, album, total_tracks, listened_tracks, listened_count, percentage, complete, image_url, first_scrobble_year)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (artist, album) DO UPDATE SET
           total_tracks = EXCLUDED.total_tracks,
           listened_tracks = EXCLUDED.listened_tracks,
           listened_count = EXCLUDED.listened_count,
           percentage = EXCLUDED.percentage,
           complete = EXCLUDED.complete,
-          image_url = COALESCE(EXCLUDED.image_url, album_stats.image_url)`,
-        [s.artist, s.album, s.totalTracks, s.listenedTracks, s.listenedCount, s.percentage, s.complete, s.imageUrl ?? null]
+          image_url = COALESCE(EXCLUDED.image_url, album_stats.image_url),
+          first_scrobble_year = COALESCE(EXCLUDED.first_scrobble_year, album_stats.first_scrobble_year)`,
+        [s.artist, s.album, s.totalTracks, s.listenedTracks, s.listenedCount, s.percentage, s.complete, s.imageUrl ?? null, s.firstScrobbleYear ?? null]
       )
     }
     // Remove albums no longer in the current sync
@@ -96,7 +99,8 @@ export async function loadStats(): Promise<{
     pool.query<{
       artist: string; album: string; total_tracks: number;
       listened_tracks: string[]; listened_count: number;
-      percentage: number; complete: boolean; image_url: string | null
+      percentage: number; complete: boolean; image_url: string | null;
+      first_scrobble_year: number | null
     }>(`SELECT * FROM album_stats ORDER BY complete ASC, percentage DESC`),
     pool.query<{ key: string; value: string }>(`SELECT * FROM sync_meta`)
   ])
@@ -114,6 +118,7 @@ export async function loadStats(): Promise<{
       percentage: r.percentage,
       complete: r.complete,
       imageUrl: r.image_url ?? undefined,
+      firstScrobbleYear: r.first_scrobble_year ?? undefined,
     })),
     totalTracks: parseInt(meta.total_tracks || '0', 10),
     fetchedAt: meta.last_sync || null,

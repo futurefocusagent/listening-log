@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
+import Timeline from './Timeline'
+import AlbumModal from './AlbumModal'
 
 interface AlbumStat {
   album: string
@@ -10,6 +12,7 @@ interface AlbumStat {
   complete: boolean
   imageUrl?: string
   spotifyId?: string
+  firstScrobbleYear?: number
 }
 
 interface ApiResponse {
@@ -21,13 +24,16 @@ interface ApiResponse {
   fetchedAt: string | null
 }
 
+type View = 'timeline' | 'progress'
 type FilterMode = 'all' | 'incomplete' | 'complete'
 
 export default function App() {
   const [data, setData] = useState<ApiResponse | null>(null)
+  const [view, setView] = useState<View>('timeline')
   const [filter, setFilter] = useState<FilterMode>('incomplete')
   const [search, setSearch] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [selectedAlbum, setSelectedAlbum] = useState<AlbumStat | null>(null)
 
   useEffect(() => {
     fetch('/api/stats')
@@ -74,45 +80,61 @@ export default function App() {
   const completeCount = data?.stats.filter(a => a.complete).length ?? 0
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px' }}>
       {/* Header */}
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>
-          🎵 Listening Log
-        </h1>
-        <p style={{ color: '#888', fontSize: 14 }}>
-          boytunewonder · album completion tracker
-        </p>
+      <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>🎵 Listening Log</h1>
+          <p style={{ color: '#666', fontSize: 13 }}>boytunewonder · album completion tracker</p>
+        </div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {(['timeline', 'progress'] as View[]).map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                background: view === v ? '#fff' : '#1a1a1a',
+                color: view === v ? '#000' : '#aaa',
+                border: '1px solid #333', borderRadius: 6,
+                padding: '6px 14px', cursor: 'pointer', fontSize: 13,
+                fontWeight: view === v ? 600 : 400,
+              }}
+            >
+              {v === 'timeline' ? 'By Year' : 'Progress'}
+            </button>
+          ))}
+          {data && !data.loading && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              style={{
+                background: '#1a1a1a', border: '1px solid #333', color: '#666',
+                padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                marginLeft: 4,
+              }}
+            >
+              {refreshing ? '…' : '↻'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats bar */}
       {data && !data.loading && (
         <div style={{
           display: 'flex', gap: 24, marginBottom: 24,
-          background: '#1a1a1a', borderRadius: 10, padding: '14px 20px',
-          flexWrap: 'wrap', alignItems: 'center'
+          background: '#1a1a1a', borderRadius: 10, padding: '12px 18px',
+          flexWrap: 'wrap', alignItems: 'center',
         }}>
           <Stat label="Total scrobbles" value={data.totalTracks.toLocaleString()} />
           <Stat label="Albums tracked" value={data.stats.length.toString()} />
           <Stat label="Need finishing" value={incompleteCount.toString()} color="#f59e0b" />
           <Stat label="Complete" value={completeCount.toString()} color="#22c55e" />
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            {data.fetchedAt && (
-              <span style={{ fontSize: 12, color: '#555' }}>
-                Updated {new Date(data.fetchedAt).toLocaleTimeString()}
-              </span>
-            )}
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing || data.loading}
-              style={{
-                background: '#2a2a2a', border: '1px solid #333', color: '#ccc',
-                padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13
-              }}
-            >
-              {refreshing ? 'Refreshing…' : '↻ Refresh'}
-            </button>
-          </div>
+          {data.fetchedAt && (
+            <span style={{ fontSize: 12, color: '#444', marginLeft: 'auto' }}>
+              Updated {new Date(data.fetchedAt).toLocaleTimeString()}
+            </span>
+          )}
         </div>
       )}
 
@@ -120,7 +142,7 @@ export default function App() {
       {data?.status === 'error' && (
         <div style={{
           background: '#1a1a1a', border: '1px solid #3a1a1a', borderRadius: 10,
-          padding: 24, textAlign: 'center', marginBottom: 24, color: '#f87171'
+          padding: 24, textAlign: 'center', marginBottom: 24, color: '#f87171',
         }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
           <p style={{ fontWeight: 600 }}>Something went wrong</p>
@@ -134,7 +156,7 @@ export default function App() {
       {data?.loading && (
         <div style={{
           background: '#1a1a1a', borderRadius: 10, padding: 24, textAlign: 'center',
-          marginBottom: 24, color: '#888'
+          marginBottom: 24, color: '#888',
         }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
           <p>Building your listening history…</p>
@@ -149,58 +171,70 @@ export default function App() {
         </div>
       )}
 
-      {/* Controls */}
-      {data && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {(['incomplete', 'all', 'complete'] as FilterMode[]).map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                style={{
-                  background: filter === f ? '#fff' : '#1a1a1a',
-                  color: filter === f ? '#000' : '#aaa',
-                  border: '1px solid #333', borderRadius: 6,
-                  padding: '6px 14px', cursor: 'pointer', fontSize: 13,
-                  fontWeight: filter === f ? 600 : 400,
-                }}
-              >
-                {f === 'incomplete' ? `Unfinished (${incompleteCount})`
-                  : f === 'complete' ? `Complete (${completeCount})`
-                  : `All (${data.stats.length})`}
-              </button>
-            ))}
-          </div>
-          <input
-            type="text"
-            placeholder="Search albums or artists…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{
-              background: '#1a1a1a', border: '1px solid #333', color: '#e0e0e0',
-              borderRadius: 6, padding: '6px 12px', fontSize: 13, flex: 1, minWidth: 200,
-              outline: 'none',
-            }}
-          />
-        </div>
+      {/* Initial loading */}
+      {!data && (
+        <div style={{ textAlign: 'center', color: '#555', padding: 60 }}>Loading…</div>
       )}
 
-      {/* Album list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {filtered.map(album => (
-          <AlbumCard key={`${album.artist}|||${album.album}`} album={album} />
-        ))}
-        {filtered.length === 0 && data && !data.loading && (
-          <div style={{ textAlign: 'center', color: '#555', padding: 40 }}>
-            No albums found
+      {/* Timeline view */}
+      {data && !data.loading && view === 'timeline' && (
+        <Timeline stats={data.stats} onAlbumClick={setSelectedAlbum} />
+      )}
+
+      {/* Progress view */}
+      {data && !data.loading && view === 'progress' && (
+        <>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['incomplete', 'all', 'complete'] as FilterMode[]).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  style={{
+                    background: filter === f ? '#fff' : '#1a1a1a',
+                    color: filter === f ? '#000' : '#aaa',
+                    border: '1px solid #333', borderRadius: 6,
+                    padding: '6px 14px', cursor: 'pointer', fontSize: 13,
+                    fontWeight: filter === f ? 600 : 400,
+                  }}
+                >
+                  {f === 'incomplete' ? `Unfinished (${incompleteCount})`
+                    : f === 'complete' ? `Complete (${completeCount})`
+                    : `All (${data.stats.length})`}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              placeholder="Search albums or artists…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                background: '#1a1a1a', border: '1px solid #333', color: '#e0e0e0',
+                borderRadius: 6, padding: '6px 12px', fontSize: 13, flex: 1, minWidth: 200,
+                outline: 'none',
+              }}
+            />
           </div>
-        )}
-        {!data && (
-          <div style={{ textAlign: 'center', color: '#555', padding: 40 }}>
-            Loading…
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {filtered.map(album => (
+              <AlbumCard
+                key={`${album.artist}|||${album.album}`}
+                album={album}
+                onClick={() => setSelectedAlbum(album)}
+              />
+            ))}
+            {filtered.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#555', padding: 40 }}>No albums found</div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
+
+      {/* Album detail modal */}
+      {selectedAlbum && (
+        <AlbumModal album={selectedAlbum} onClose={() => setSelectedAlbum(null)} />
+      )}
     </div>
   )
 }
@@ -208,14 +242,14 @@ export default function App() {
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: color || '#e0e0e0' }}>{value}</div>
-      <div style={{ fontSize: 12, color: '#666' }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: color || '#e0e0e0' }}>{value}</div>
+      <div style={{ fontSize: 12, color: '#555' }}>{label}</div>
     </div>
   )
 }
 
-function AlbumCard({ album }: { album: AlbumStat }) {
-  const [expanded, setExpanded] = useState(false)
+function AlbumCard({ album, onClick }: { album: AlbumStat; onClick: () => void }) {
+  const [imgError, setImgError] = useState(false)
 
   const barColor = album.complete ? '#22c55e'
     : album.percentage >= 75 ? '#84cc16'
@@ -232,17 +266,17 @@ function AlbumCard({ album }: { album: AlbumStat }) {
         padding: '14px 16px',
         cursor: 'pointer',
       }}
-      onClick={() => setExpanded(e => !e)}
+      onClick={onClick}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {/* Album art or completion ring */}
+        {/* Album art or ring */}
         <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
-          {album.imageUrl ? (
+          {album.imageUrl && !imgError ? (
             <img
               src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
               alt={album.album}
               style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', display: 'block' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+              onError={() => setImgError(true)}
             />
           ) : (
             <div style={{
@@ -251,8 +285,7 @@ function AlbumCard({ album }: { album: AlbumStat }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <div style={{
-                width: 36, height: 36, borderRadius: '50%',
-                background: '#1a1a1a',
+                width: 36, height: 36, borderRadius: '50%', background: '#1a1a1a',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 11, fontWeight: 700, color: barColor,
               }}>
@@ -260,8 +293,7 @@ function AlbumCard({ album }: { album: AlbumStat }) {
               </div>
             </div>
           )}
-          {/* Percentage badge over image */}
-          {album.imageUrl && (
+          {album.imageUrl && !imgError && (
             <div style={{
               position: 'absolute', bottom: -4, right: -4,
               background: barColor, color: '#000',
@@ -277,26 +309,21 @@ function AlbumCard({ album }: { album: AlbumStat }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontWeight: 600, fontSize: 15,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {album.album}
           </div>
-          <div style={{ color: '#888', fontSize: 13, marginTop: 2 }}>
-            {album.artist}
-          </div>
+          <div style={{ color: '#888', fontSize: 13, marginTop: 2 }}>{album.artist}</div>
         </div>
 
         {/* Track count */}
         <div style={{ textAlign: 'right', flexShrink: 0, fontSize: 13 }}>
-          <span style={{ color: barColor, fontWeight: 600 }}>
-            {album.listenedCount}
-          </span>
-          {album.totalTracks > 0 && (
-            <span style={{ color: '#555' }}>/{album.totalTracks}</span>
-          )}
+          <span style={{ color: barColor, fontWeight: 600 }}>{album.listenedCount}</span>
+          {album.totalTracks > 0 && <span style={{ color: '#555' }}>/{album.totalTracks}</span>}
           <div style={{ color: '#555', fontSize: 12 }}>tracks</div>
         </div>
 
+        {/* Spotify */}
         <a
           href={album.spotifyId
             ? `spotify:album:${album.spotifyId}`
@@ -305,30 +332,8 @@ function AlbumCard({ album }: { album: AlbumStat }) {
           title="Open in Spotify"
           onClick={e => e.stopPropagation()}
           style={{ fontSize: 18, textDecoration: 'none', flexShrink: 0 }}
-        >
-          🎧
-        </a>
-        <span style={{ color: '#444', fontSize: 12 }}>{expanded ? '▲' : '▼'}</span>
+        >🎧</a>
       </div>
-
-      {/* Expanded track list */}
-      {expanded && (
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #2a2a2a' }}>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-            Tracks listened:
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {album.listenedTracks.map(t => (
-              <span key={t} style={{
-                background: '#2a2a2a', borderRadius: 4,
-                padding: '3px 8px', fontSize: 12, color: '#ccc'
-              }}>
-                {t}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

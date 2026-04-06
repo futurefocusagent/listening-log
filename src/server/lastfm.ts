@@ -17,6 +17,8 @@ export interface AlbumStat {
   percentage: number
   complete: boolean
   imageUrl?: string
+  spotifyId?: string
+  firstScrobbleYear?: number
 }
 
 async function lfmGet(params: Record<string, string>): Promise<unknown> {

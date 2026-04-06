@@ -48,11 +48,14 @@ async function doRefresh(force = false) {
     console.log(`Got ${tracks.length} tracks`)
 
     // Build album map
-    const albumMap = new Map<string, { artist: string; album: string; tracks: Set<string> }>()
+    const albumMap = new Map<string, { artist: string; album: string; tracks: Set<string>; firstYear: number }>()
     for (const t of tracks) {
       const key = `${t.artist.toLowerCase()}|||${t.album.toLowerCase()}`
-      if (!albumMap.has(key)) albumMap.set(key, { artist: t.artist, album: t.album, tracks: new Set() })
-      albumMap.get(key)!.tracks.add(t.name.toLowerCase())
+      const year = t.playedAt ? new Date(t.playedAt).getFullYear() : new Date().getFullYear()
+      if (!albumMap.has(key)) albumMap.set(key, { artist: t.artist, album: t.album, tracks: new Set(), firstYear: year })
+      const entry = albumMap.get(key)!
+      entry.tracks.add(t.name.toLowerCase())
+      if (year < entry.firstYear) entry.firstYear = year
     }
 
     const albumEntries = Array.from(albumMap.entries())
@@ -61,7 +64,7 @@ async function doRefresh(force = false) {
 
     const newStats: AlbumStat[] = []
     let done = 0
-    for (const [, { artist, album, tracks: listenedSet }] of albumEntries) {
+    for (const [, { artist, album, tracks: listenedSet, firstYear }] of albumEntries) {
       done++
       state.progress = `Looking up album info: ${done}/${albumEntries.length}`
 
@@ -78,6 +81,7 @@ async function doRefresh(force = false) {
           percentage: 0,
           complete: false,
           imageUrl: info?.imageUrl,
+          firstScrobbleYear: firstYear,
         }
       } else {
         const matchedCount = info.tracks.filter(t => listenedSet.has(t)).length
@@ -92,6 +96,7 @@ async function doRefresh(force = false) {
           percentage,
           complete: listenedCount >= info.totalTracks,
           imageUrl: info.imageUrl,
+          firstScrobbleYear: firstYear,
         }
       }
       newStats.push(stat)
