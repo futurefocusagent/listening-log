@@ -31,6 +31,7 @@ export async function initDb() {
   `)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS image_url TEXT`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS release_year INT`)
+  await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS spotify_id TEXT`)
   console.log('DB initialized')
 }
 
@@ -88,6 +89,20 @@ export async function updateReleaseYear(artist: string, album: string, year: num
   )
 }
 
+export async function updateSpotifyId(artist: string, album: string, spotifyId: string) {
+  await pool.query(
+    `UPDATE album_stats SET spotify_id = $1 WHERE artist = $2 AND album = $3`,
+    [spotifyId, artist, album]
+  )
+}
+
+export async function getAlbumsMissingSpotifyId(): Promise<Array<{ artist: string; album: string }>> {
+  const result = await pool.query<{ artist: string; album: string }>(
+    `SELECT artist, album FROM album_stats WHERE spotify_id IS NULL ORDER BY artist LIMIT 500`
+  )
+  return result.rows
+}
+
 export async function getAlbumsMissingImages(): Promise<Array<{ artist: string; album: string }>> {
   const result = await pool.query<{ artist: string; album: string }>(
     `SELECT artist, album FROM album_stats WHERE image_url IS NULL ORDER BY artist`
@@ -112,7 +127,7 @@ export async function loadStats(): Promise<{
       artist: string; album: string; total_tracks: number;
       listened_tracks: string[]; listened_count: number;
       percentage: number; complete: boolean; image_url: string | null;
-      release_year: number | null
+      release_year: number | null; spotify_id: string | null
     }>(`SELECT * FROM album_stats ORDER BY complete ASC, percentage DESC`),
     pool.query<{ key: string; value: string }>(`SELECT * FROM sync_meta`)
   ])
@@ -131,6 +146,7 @@ export async function loadStats(): Promise<{
       complete: r.complete,
       imageUrl: r.image_url ?? undefined,
       releaseYear: r.release_year ?? undefined,
+      spotifyId: r.spotify_id ?? undefined,
     })),
     totalTracks: parseInt(meta.total_tracks || '0', 10),
     fetchedAt: meta.last_sync || null,

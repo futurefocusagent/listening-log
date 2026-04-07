@@ -2,8 +2,9 @@ import 'dotenv/config'
 import express from 'express'
 import path from 'path'
 import { getAllTracks, getAlbumInfo, AlbumStat } from './lastfm'
-import { initDb, saveStats, loadStats, updateImageUrl, getAlbumsMissingImages, updateReleaseYear, getAlbumsMissingYear } from './db'
+import { initDb, saveStats, loadStats, updateImageUrl, getAlbumsMissingImages, updateReleaseYear, getAlbumsMissingYear, updateSpotifyId, getAlbumsMissingSpotifyId } from './db'
 import { getReleaseYear } from './musicbrainz'
+import { searchAlbum as spotifySearchAlbum } from './spotify'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -161,6 +162,32 @@ async function backfillImages() {
   console.log('Image backfill complete')
 }
 
+async function backfillSpotifyIds() {
+  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    console.log('Spotify credentials not set, skipping Spotify ID backfill')
+    return
+  }
+  const missing = await getAlbumsMissingSpotifyId()
+  if (missing.length === 0) return
+  console.log(`Backfilling Spotify IDs for ${missing.length} albums...`)
+  let found = 0
+  for (const { artist, album } of missing) {
+    const spotifyId = await spotifySearchAlbum(artist, album)
+    if (spotifyId) {
+      await updateSpotifyId(artist, album, spotifyId)
+      const stat = state.stats.find(
+        s => s.artist.toLowerCase() === artist.toLowerCase() &&
+             s.album.toLowerCase() === album.toLowerCase()
+      )
+      if (stat) stat.spotifyId = spotifyId
+      found++
+    }
+    // Spotify rate limit: ~30 req/sec, but let's be gentle
+    await new Promise(r => setTimeout(r, 100))
+  }
+  console.log(`Spotify ID backfill complete — found ${found}/${missing.length}`)
+}
+
 async function boot() {
   // Init DB schema
   try {
@@ -202,9 +229,10 @@ async function boot() {
     console.log('Data stale, background syncing...')
     doRefresh(true)
   } else {
-    // Backfill missing images and release years in the background
+    // Backfill missing images, release years, and Spotify IDs in the background
     backfillImages()
     backfillYears()
+    backfillSpotifyIds()
   }
 
   // Schedule periodic re-sync
