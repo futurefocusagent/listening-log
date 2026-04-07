@@ -1,5 +1,6 @@
-import { Pool } from 'pg'
-import { AlbumStat } from './lastfm'
+import pg from 'pg'
+import { AlbumStat } from './lastfm.js'
+const { Pool } = pg
 
 // Render internal URLs use the short hostname (no domain); external ones have oregon-postgres.render.com
 const isInternal = process.env.DATABASE_URL?.match(/@dpg-[^.]+\//) !== null
@@ -21,6 +22,7 @@ export async function initDb() {
       complete BOOLEAN NOT NULL DEFAULT FALSE,
       image_url TEXT,
       release_year INT,
+      spotify_id TEXT,
       UNIQUE(artist, album)
     );
 
@@ -29,6 +31,7 @@ export async function initDb() {
       value TEXT NOT NULL
     );
   `)
+  // Ensure columns exist (for upgrades)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS image_url TEXT`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS release_year INT`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS spotify_id TEXT`)
@@ -42,8 +45,8 @@ export async function saveStats(stats: AlbumStat[], totalTracks: number) {
     for (const s of stats) {
       await client.query(
         `INSERT INTO album_stats
-          (artist, album, total_tracks, listened_tracks, listened_count, percentage, complete, image_url, release_year)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          (artist, album, total_tracks, listened_tracks, listened_count, percentage, complete, image_url, release_year, spotify_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (artist, album) DO UPDATE SET
           total_tracks = EXCLUDED.total_tracks,
           listened_tracks = EXCLUDED.listened_tracks,
@@ -51,8 +54,9 @@ export async function saveStats(stats: AlbumStat[], totalTracks: number) {
           percentage = EXCLUDED.percentage,
           complete = EXCLUDED.complete,
           image_url = COALESCE(EXCLUDED.image_url, album_stats.image_url),
-          release_year = COALESCE(EXCLUDED.release_year, album_stats.release_year)`,
-        [s.artist, s.album, s.totalTracks, s.listenedTracks, s.listenedCount, s.percentage, s.complete, s.imageUrl ?? null, s.releaseYear ?? null]
+          release_year = COALESCE(EXCLUDED.release_year, album_stats.release_year),
+          spotify_id = COALESCE(EXCLUDED.spotify_id, album_stats.spotify_id)`,
+        [s.artist, s.album, s.totalTracks, s.listenedTracks, s.listenedCount, s.percentage, s.complete, s.imageUrl ?? null, s.releaseYear ?? null, s.spotifyId ?? null]
       )
     }
     // Remove albums no longer in the current sync
@@ -75,44 +79,47 @@ export async function saveStats(stats: AlbumStat[], totalTracks: number) {
   }
 }
 
-export async function updateImageUrl(artist: string, album: string, imageUrl: string) {
+export async function updateAlbumMetadata(
+  artist: string, 
+  album: string, 
+  metadata: { spotifyId?: string; releaseYear?: number; imageUrl?: string; totalTracks?: number }
+) {
+  const sets: string[] = []
+  const values: (string | number)[] = []
+  let i = 1
+
+  if (metadata.spotifyId !== undefined) {
+    sets.push(`spotify_id = $${i++}`)
+    values.push(metadata.spotifyId)
+  }
+  if (metadata.releaseYear !== undefined) {
+    sets.push(`release_year = $${i++}`)
+    values.push(metadata.releaseYear)
+  }
+  if (metadata.imageUrl !== undefined) {
+    sets.push(`image_url = $${i++}`)
+    values.push(metadata.imageUrl)
+  }
+  if (metadata.totalTracks !== undefined) {
+    sets.push(`total_tracks = $${i++}`)
+    values.push(metadata.totalTracks)
+  }
+
+  if (sets.length === 0) return
+
+  values.push(artist, album)
   await pool.query(
-    `UPDATE album_stats SET image_url = $1 WHERE artist = $2 AND album = $3`,
-    [imageUrl, artist, album]
+    `UPDATE album_stats SET ${sets.join(', ')} WHERE artist = $${i++} AND album = $${i}`,
+    values
   )
 }
 
-export async function updateReleaseYear(artist: string, album: string, year: number) {
-  await pool.query(
-    `UPDATE album_stats SET release_year = $1 WHERE artist = $2 AND album = $3`,
-    [year, artist, album]
-  )
-}
-
-export async function updateSpotifyId(artist: string, album: string, spotifyId: string) {
-  await pool.query(
-    `UPDATE album_stats SET spotify_id = $1 WHERE artist = $2 AND album = $3`,
-    [spotifyId, artist, album]
-  )
-}
-
-export async function getAlbumsMissingSpotifyId(): Promise<Array<{ artist: string; album: string }>> {
+export async function getAlbumsMissingMetadata(limit = 100): Promise<Array<{ artist: string; album: string }>> {
   const result = await pool.query<{ artist: string; album: string }>(
-    `SELECT artist, album FROM album_stats WHERE spotify_id IS NULL ORDER BY artist LIMIT 500`
-  )
-  return result.rows
-}
-
-export async function getAlbumsMissingImages(): Promise<Array<{ artist: string; album: string }>> {
-  const result = await pool.query<{ artist: string; album: string }>(
-    `SELECT artist, album FROM album_stats WHERE image_url IS NULL ORDER BY artist`
-  )
-  return result.rows
-}
-
-export async function getAlbumsMissingYear(): Promise<Array<{ artist: string; album: string }>> {
-  const result = await pool.query<{ artist: string; album: string }>(
-    `SELECT artist, album FROM album_stats WHERE release_year IS NULL ORDER BY artist`
+    `SELECT artist, album FROM album_stats 
+     WHERE spotify_id IS NULL OR release_year IS NULL OR image_url IS NULL
+     ORDER BY artist LIMIT $1`,
+    [limit]
   )
   return result.rows
 }

@@ -1,10 +1,10 @@
 import 'dotenv/config'
 import express from 'express'
 import path from 'path'
-import { getAllTracks, getAlbumInfo, AlbumStat } from './lastfm'
-import { initDb, saveStats, loadStats, updateImageUrl, getAlbumsMissingImages, updateReleaseYear, getAlbumsMissingYear, updateSpotifyId, getAlbumsMissingSpotifyId } from './db'
-import { getReleaseYear } from './musicbrainz'
-import { searchAlbum as spotifySearchAlbum } from './spotify'
+import { getAllTracks, AlbumStat } from './lastfm.js'
+import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata } from './db.js'
+import { searchAlbum as spotifySearchAlbum, SpotifyAlbumInfo } from './spotify.js'
+import { initLoggerDb, startSyncLog, updateSyncLog, logError, finishSyncLog, getRecentSyncLogs } from './logger.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -37,19 +37,24 @@ async function doRefresh(force = false) {
   if (!force && Date.now() - lastSync < SYNC_INTERVAL_MS) return
   refreshLock = true
   const hasExistingData = state.stats.length > 0
+  
   try {
+    await startSyncLog()
+    
     if (!hasExistingData) state.status = 'fetching-tracks'
-    state.progress = 'Fetching scrobbles...'
+    state.progress = 'Fetching scrobbles from Last.fm...'
+    await updateSyncLog({ phase: 'fetching-scrobbles' })
     console.log('Syncing Last.fm data for', LASTFM_USER)
 
+    // 1. Get scrobble history from Last.fm (what was listened to)
     const fromTs = Math.floor(Date.now() / 1000) - 10 * 365 * 24 * 60 * 60
     const tracks = await getAllTracks(LASTFM_USER, fromTs, (page, total) => {
       state.progress = `Fetching scrobbles: page ${page}/${total}`
     })
     state.totalTracks = tracks.length
-    console.log(`Got ${tracks.length} tracks`)
+    console.log(`Got ${tracks.length} tracks from Last.fm`)
 
-    // Build album map
+    // 2. Build album map from scrobbles
     const albumMap = new Map<string, { artist: string; album: string; tracks: Set<string> }>()
     for (const t of tracks) {
       const key = `${t.artist.toLowerCase()}|||${t.album.toLowerCase()}`
@@ -58,47 +63,81 @@ async function doRefresh(force = false) {
     }
 
     const albumEntries = Array.from(albumMap.entries())
-    console.log(`${albumEntries.length} unique albums — looking up track counts`)
+    console.log(`${albumEntries.length} unique albums`)
+    await updateSyncLog({ phase: 'enriching-metadata', totalAlbums: albumEntries.length })
+    
     if (!hasExistingData) state.status = 'fetching-albums'
 
+    // 3. Enrich each album with Spotify metadata
     const newStats: AlbumStat[] = []
     let done = 0
+    let spotifyHits = 0
+    let spotifyMisses = 0
+
     for (const [, { artist, album, tracks: listenedSet }] of albumEntries) {
       done++
-      state.progress = `Looking up album info: ${done}/${albumEntries.length}`
+      state.progress = `Enriching album ${done}/${albumEntries.length}: ${artist} - ${album}`
+      
+      if (done % 100 === 0) {
+        await updateSyncLog({ albumsProcessed: done, spotifyHits, spotifyMisses })
+      }
 
-      const info = await getAlbumInfo(artist, album)
-      await new Promise(r => setTimeout(r, 100))
+      // Try Spotify for metadata
+      let spotifyInfo: SpotifyAlbumInfo | null = null
+      try {
+        spotifyInfo = await spotifySearchAlbum(artist, album)
+        if (spotifyInfo) {
+          spotifyHits++
+        } else {
+          spotifyMisses++
+          logError(artist, album, 'Not found on Spotify')
+        }
+      } catch (err) {
+        spotifyMisses++
+        logError(artist, album, `Spotify error: ${(err as Error).message}`)
+      }
+
+      // Rate limit: Spotify allows 30 req/sec, but be conservative
+      await new Promise(r => setTimeout(r, 50))
 
       let stat: AlbumStat
-      if (!info || info.totalTracks === 0) {
+      if (spotifyInfo) {
+        // Use Spotify data for track matching
+        const matchedCount = spotifyInfo.tracks.filter(t => listenedSet.has(t)).length
+        const listenedCount = matchedCount > 0 ? matchedCount : listenedSet.size
+        const percentage = Math.min(100, Math.round((listenedCount / spotifyInfo.totalTracks) * 100))
+        
         stat = {
-          album, artist,
-          totalTracks: 0,
+          album: spotifyInfo.name,
+          artist: spotifyInfo.artist,
+          totalTracks: spotifyInfo.totalTracks,
+          listenedTracks: Array.from(listenedSet),
+          listenedCount,
+          percentage,
+          complete: listenedCount >= spotifyInfo.totalTracks,
+          imageUrl: spotifyInfo.imageUrl ?? undefined,
+          releaseYear: spotifyInfo.releaseYear,
+          spotifyId: spotifyInfo.spotifyId,
+        }
+      } else {
+        // No Spotify data - use Last.fm scrobble data only
+        stat = {
+          album,
+          artist,
+          totalTracks: 0,  // Unknown
           listenedTracks: Array.from(listenedSet),
           listenedCount: listenedSet.size,
           percentage: 0,
           complete: false,
-          imageUrl: info?.imageUrl,
-        }
-      } else {
-        const matchedCount = info.tracks.filter(t => listenedSet.has(t)).length
-        const listenedCount = matchedCount > 0 ? matchedCount : listenedSet.size
-        const percentage = Math.min(100, Math.round((listenedCount / info.totalTracks) * 100))
-        stat = {
-          album: info.name,
-          artist: info.artist,
-          totalTracks: info.totalTracks,
-          listenedTracks: Array.from(listenedSet),
-          listenedCount,
-          percentage,
-          complete: listenedCount >= info.totalTracks,
-          imageUrl: info.imageUrl,
+          // No image, year, or Spotify ID
         }
       }
       newStats.push(stat)
     }
 
+    await updateSyncLog({ albumsProcessed: done, spotifyHits, spotifyMisses, phase: 'saving' })
+
+    // Sort: incomplete first (by percentage desc), then complete
     newStats.sort((a, b) => {
       if (a.complete !== b.complete) return a.complete ? 1 : -1
       if (!a.totalTracks && b.totalTracks) return 1
@@ -106,10 +145,10 @@ async function doRefresh(force = false) {
       return b.percentage - a.percentage
     })
 
-    // Persist to DB
+    // 4. Save to DB
     await saveStats(newStats, state.totalTracks)
     
-    // Reload from DB to get enriched data (release_year, spotify_id, etc)
+    // 5. Reload from DB to ensure consistency
     const reloaded = await loadStats()
     if (reloaded) {
       state.stats = reloaded.stats
@@ -123,90 +162,62 @@ async function doRefresh(force = false) {
     lastSync = Date.now()
     state.status = 'done'
     state.progress = ''
-    console.log('Sync complete —', state.stats.length, 'albums saved to DB')
     
-    // Run backfills after sync
-    backfillYears()
-    backfillSpotifyIds()
-    backfillImages()
+    await finishSyncLog('success')
+    console.log(`Sync complete — ${state.stats.length} albums, ${spotifyHits} Spotify hits, ${spotifyMisses} misses`)
+    
   } catch (err) {
     state.status = 'error'
     state.progress = String(err)
     console.error('Sync error:', err)
+    await finishSyncLog('error', (err as Error).message)
   } finally {
     refreshLock = false
   }
 }
 
-async function backfillYears() {
-  const missing = await getAlbumsMissingYear()
+// Background job to enrich albums missing metadata
+async function enrichMissingMetadata() {
+  const missing = await getAlbumsMissingMetadata(100)
   if (missing.length === 0) return
-  console.log(`Backfilling release years for ${missing.length} albums via MusicBrainz...`)
+  
+  console.log(`Enriching ${missing.length} albums missing Spotify metadata...`)
+  let enriched = 0
+  
   for (const { artist, album } of missing) {
-    const year = await getReleaseYear(artist, album)
-    if (year) {
-      await updateReleaseYear(artist, album, year)
+    const info = await spotifySearchAlbum(artist, album)
+    if (info) {
+      await updateAlbumMetadata(artist, album, {
+        spotifyId: info.spotifyId,
+        releaseYear: info.releaseYear,
+        imageUrl: info.imageUrl ?? undefined,
+        totalTracks: info.totalTracks,
+      })
+      
+      // Update in-memory state
       const stat = state.stats.find(
         s => s.artist.toLowerCase() === artist.toLowerCase() &&
              s.album.toLowerCase() === album.toLowerCase()
       )
-      if (stat) stat.releaseYear = year
+      if (stat) {
+        stat.spotifyId = info.spotifyId
+        stat.releaseYear = info.releaseYear
+        stat.imageUrl = info.imageUrl ?? stat.imageUrl
+        stat.totalTracks = info.totalTracks
+      }
+      enriched++
     }
-    // MusicBrainz rate limit handled inside getReleaseYear
+    await new Promise(r => setTimeout(r, 50))
   }
-  console.log('Year backfill complete')
-}
-
-async function backfillImages() {
-  const missing = await getAlbumsMissingImages()
-  if (missing.length === 0) return
-  console.log(`Backfilling images for ${missing.length} albums...`)
-  for (const { artist, album } of missing) {
-    const info = await getAlbumInfo(artist, album)
-    if (info?.imageUrl) {
-      await updateImageUrl(artist, album, info.imageUrl)
-      // Update in-memory state so the proxy endpoint can serve it immediately
-      const stat = state.stats.find(
-        s => s.artist.toLowerCase() === artist.toLowerCase() &&
-             s.album.toLowerCase() === album.toLowerCase()
-      )
-      if (stat) stat.imageUrl = info.imageUrl
-    }
-    await new Promise(r => setTimeout(r, 150))
-  }
-  console.log('Image backfill complete')
-}
-
-async function backfillSpotifyIds() {
-  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-    console.log('Spotify credentials not set, skipping Spotify ID backfill')
-    return
-  }
-  const missing = await getAlbumsMissingSpotifyId()
-  if (missing.length === 0) return
-  console.log(`Backfilling Spotify IDs for ${missing.length} albums...`)
-  let found = 0
-  for (const { artist, album } of missing) {
-    const spotifyId = await spotifySearchAlbum(artist, album)
-    if (spotifyId) {
-      await updateSpotifyId(artist, album, spotifyId)
-      const stat = state.stats.find(
-        s => s.artist.toLowerCase() === artist.toLowerCase() &&
-             s.album.toLowerCase() === album.toLowerCase()
-      )
-      if (stat) stat.spotifyId = spotifyId
-      found++
-    }
-    // Spotify rate limit: ~30 req/sec, but let's be gentle
-    await new Promise(r => setTimeout(r, 100))
-  }
-  console.log(`Spotify ID backfill complete — found ${found}/${missing.length}`)
+  
+  console.log(`Enriched ${enriched}/${missing.length} albums`)
 }
 
 async function boot() {
-  // Init DB schema
+  // Init DB schemas
   try {
     await initDb()
+    await initLoggerDb()
   } catch (err) {
     console.error('DB init failed:', err)
     state.status = 'error'
@@ -234,26 +245,25 @@ async function boot() {
     console.log(`Loaded ${state.stats.length} albums from DB (cached ${cached.fetchedAt})`)
   }
 
-  // DB empty = first ever run, sync from Last.fm
-  // DB stale = background re-sync (silent, data already shown)
+  // DB empty = first ever run, sync from scratch
+  // DB stale = background re-sync
   const stale = Date.now() - lastSync > SYNC_INTERVAL_MS
   if (!cached) {
-    console.log('DB empty — first run, syncing from Last.fm...')
+    console.log('DB empty — first run, syncing from Last.fm + Spotify...')
     doRefresh(true)
   } else if (stale) {
     console.log('Data stale, background syncing...')
     doRefresh(true)
   } else {
-    // Backfill missing images, release years, and Spotify IDs in the background
-    backfillImages()
-    backfillYears()
-    backfillSpotifyIds()
+    // Just enrich any missing metadata in background
+    enrichMissingMetadata()
   }
 
   // Schedule periodic re-sync
   setInterval(() => doRefresh(), SYNC_INTERVAL_MS)
 }
 
+// API endpoints
 app.get('/api/stats', (_req, res) => {
   res.json({
     loading: state.status === 'fetching-tracks' || state.status === 'fetching-albums',
@@ -263,6 +273,11 @@ app.get('/api/stats', (_req, res) => {
     totalTracks: state.totalTracks,
     fetchedAt: state.fetchedAt,
   })
+})
+
+app.get('/api/sync-logs', async (_req, res) => {
+  const logs = await getRecentSyncLogs(20)
+  res.json(logs)
 })
 
 // Proxy album art — avoids hotlinking, caches in memory
@@ -307,7 +322,7 @@ app.post('/api/refresh', (_req, res) => {
 
 const clientDist = path.join(__dirname, '../client')
 app.use(express.static(clientDist))
-app.get('*', (_req, res) => {
+app.get('*path', (_req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'), err => {
     if (err) res.status(500).send('Client not found')
   })
