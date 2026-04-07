@@ -105,15 +105,30 @@ async function doRefresh(force = false) {
       if (!b.totalTracks && a.totalTracks) return -1
       return b.percentage - a.percentage
     })
-    state.stats = newStats
 
     // Persist to DB
-    await saveStats(state.stats, state.totalTracks)
+    await saveStats(newStats, state.totalTracks)
+    
+    // Reload from DB to get enriched data (release_year, spotify_id, etc)
+    const reloaded = await loadStats()
+    if (reloaded) {
+      state.stats = reloaded.stats
+      state.totalTracks = reloaded.totalTracks
+      state.fetchedAt = reloaded.fetchedAt
+    } else {
+      state.stats = newStats
+      state.fetchedAt = new Date().toISOString()
+    }
+    
     lastSync = Date.now()
     state.status = 'done'
-    state.fetchedAt = new Date().toISOString()
     state.progress = ''
     console.log('Sync complete —', state.stats.length, 'albums saved to DB')
+    
+    // Run backfills after sync
+    backfillYears()
+    backfillSpotifyIds()
+    backfillImages()
   } catch (err) {
     state.status = 'error'
     state.progress = String(err)
