@@ -4,7 +4,7 @@ import path from 'path'
 import { getAllTracks, AlbumStat } from './lastfm.js'
 import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata } from './db.js'
 import { searchAlbum as spotifySearchAlbum, SpotifyAlbumInfo } from './spotify.js'
-import { initLoggerDb, startSyncLog, updateSyncLog, logError, finishSyncLog, getRecentSyncLogs } from './logger.js'
+import { initLoggerDb, startSyncLog, updateSyncLog, logError, finishSyncLog, getRecentSyncLogs, getUnacknowledgedAlerts, acknowledgeAlert, acknowledgeAllAlerts } from './logger.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -278,6 +278,21 @@ app.get('/api/stats', (_req, res) => {
 app.get('/api/sync-logs', async (_req, res) => {
   const logs = await getRecentSyncLogs(20)
   res.json(logs)
+})
+
+app.get('/api/alerts', async (_req, res) => {
+  const alerts = await getUnacknowledgedAlerts()
+  res.json(alerts)
+})
+
+app.post('/api/alerts/:id/ack', async (req, res) => {
+  await acknowledgeAlert(parseInt(req.params.id, 10))
+  res.json({ ok: true })
+})
+
+app.post('/api/alerts/ack-all', async (_req, res) => {
+  await acknowledgeAllAlerts()
+  res.json({ ok: true })
 })
 
 // Proxy album art — avoids hotlinking, caches in memory

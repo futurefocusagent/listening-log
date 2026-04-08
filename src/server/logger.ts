@@ -14,6 +14,17 @@ const SCHEMA = 'listening_log'
 export async function initLoggerDb() {
   await pool.query(`CREATE SCHEMA IF NOT EXISTS ${SCHEMA}`)
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${SCHEMA}.alerts (
+      id SERIAL PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      acknowledged_at TIMESTAMPTZ,
+      severity TEXT NOT NULL DEFAULT 'error',
+      source TEXT NOT NULL,
+      message TEXT NOT NULL,
+      details JSONB
+    )
+  `)
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS ${SCHEMA}.sync_logs (
       id SERIAL PRIMARY KEY,
       started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -125,7 +136,7 @@ export async function finishSyncLog(status: 'success' | 'error', errorMessage?: 
   // "not found on Spotify" is expected for obscure releases
   const realErrors = currentLog.errors.filter(e => !e.error.includes('Not found on Spotify'))
   if (status === 'error' || realErrors.length > 20) {
-    await sendAlert(status, errorMessage, realErrors)
+    await saveAlert(status, errorMessage, realErrors)
   }
   
   console.log(`Sync ${status}: ${currentLog.albumsProcessed}/${currentLog.totalAlbums} albums, ${currentLog.spotifyHits} Spotify hits, ${currentLog.spotifyMisses} misses, ${currentLog.errors.length} errors`)
@@ -134,51 +145,37 @@ export async function finishSyncLog(status: 'success' | 'error', errorMessage?: 
   currentLog = null
 }
 
-async function sendAlert(status: string, errorMessage?: string, realErrors?: Array<{ album: string; artist: string; error: string }>) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_ALERT_CHAT_ID
+async function saveAlert(
+  status: string, 
+  errorMessage?: string, 
+  realErrors?: Array<{ album: string; artist: string; error: string }>
+) {
+  if (!currentLog) return
   
-  if (!botToken || !chatId || !currentLog) {
-    console.log('Telegram alerting not configured')
-    return
+  const message = status === 'error' 
+    ? `Sync failed: ${errorMessage || 'Unknown error'}`
+    : `Sync completed with ${realErrors?.length || 0} errors`
+  
+  const details = {
+    phase: currentLog.phase,
+    albumsProcessed: currentLog.albumsProcessed,
+    totalAlbums: currentLog.totalAlbums,
+    spotifyHits: currentLog.spotifyHits,
+    spotifyMisses: currentLog.spotifyMisses,
+    errorCount: currentLog.errors.length,
+    realErrorCount: realErrors?.length || 0,
+    recentErrors: realErrors?.slice(-10) || [],
+    errorMessage,
   }
-
-  const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const message = [
-    `🚨 <b>Listening Log Alert for FFAgent</b>`,
-    ``,
-    `A sync operation ${status === 'error' ? 'failed' : 'completed with issues'}.`,
-    ``,
-    `<b>Phase:</b> ${currentLog.phase}`,
-    `<b>Progress:</b> ${currentLog.albumsProcessed}/${currentLog.totalAlbums} albums`,
-    `<b>Spotify Hits:</b> ${currentLog.spotifyHits}`,
-    `<b>Spotify Misses:</b> ${currentLog.spotifyMisses}`,
-    `<b>Errors:</b> ${currentLog.errors.length}`,
-    errorMessage ? `<b>Error:</b> <code>${escapeHtml(errorMessage.slice(0, 300))}</code>` : '',
-    ``,
-    (realErrors && realErrors.length > 0)
-      ? `<b>Recent errors:</b>\n${realErrors.slice(-5).map(e => `• ${escapeHtml(e.artist)} - ${escapeHtml(e.album)}: ${escapeHtml(e.error)}`).join('\n')}`
-      : '',
-  ].filter(Boolean).join('\n')
-
+  
   try {
-    const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'HTML',
-      }),
-    })
-    const result = await resp.json() as { ok: boolean; description?: string }
-    if (!result.ok) {
-      console.error('Telegram API error:', result.description)
-    } else {
-      console.log('Alert sent to Telegram')
-    }
+    await pool.query(
+      `INSERT INTO ${SCHEMA}.alerts (severity, source, message, details) VALUES ($1, $2, $3, $4)`,
+      [status === 'error' ? 'error' : 'warning', 'sync', message, JSON.stringify(details)]
+    )
+    console.log(`Alert saved to DB: ${message}`)
   } catch (err) {
-    console.error('Failed to send Telegram alert:', err)
+    console.error('Failed to save alert:', err)
   }
 }
 
@@ -189,4 +186,27 @@ export async function getRecentSyncLogs(limit = 20) {
     [limit]
   )
   return result.rows
+}
+
+// Get unacknowledged alerts
+export async function getUnacknowledgedAlerts() {
+  const result = await pool.query(
+    `SELECT * FROM ${SCHEMA}.alerts WHERE acknowledged_at IS NULL ORDER BY created_at DESC`
+  )
+  return result.rows
+}
+
+// Acknowledge an alert
+export async function acknowledgeAlert(id: number) {
+  await pool.query(
+    `UPDATE ${SCHEMA}.alerts SET acknowledged_at = NOW() WHERE id = $1`,
+    [id]
+  )
+}
+
+// Acknowledge all alerts
+export async function acknowledgeAllAlerts() {
+  await pool.query(
+    `UPDATE ${SCHEMA}.alerts SET acknowledged_at = NOW() WHERE acknowledged_at IS NULL`
+  )
 }
