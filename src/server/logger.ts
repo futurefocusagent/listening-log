@@ -121,9 +121,11 @@ export async function finishSyncLog(status: 'success' | 'error', errorMessage?: 
     ]
   )
   
-  // Send alert on error
-  if (status === 'error' || currentLog.errors.length > 50) {
-    await sendAlert(status, errorMessage)
+  // Send alert only on actual failures, not "not found" cases
+  // "not found on Spotify" is expected for obscure releases
+  const realErrors = currentLog.errors.filter(e => !e.error.includes('Not found on Spotify'))
+  if (status === 'error' || realErrors.length > 20) {
+    await sendAlert(status, errorMessage, realErrors)
   }
   
   console.log(`Sync ${status}: ${currentLog.albumsProcessed}/${currentLog.totalAlbums} albums, ${currentLog.spotifyHits} Spotify hits, ${currentLog.spotifyMisses} misses, ${currentLog.errors.length} errors`)
@@ -132,7 +134,7 @@ export async function finishSyncLog(status: 'success' | 'error', errorMessage?: 
   currentLog = null
 }
 
-async function sendAlert(status: string, errorMessage?: string) {
+async function sendAlert(status: string, errorMessage?: string, realErrors?: Array<{ album: string; artist: string; error: string }>) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_ALERT_CHAT_ID
   
@@ -154,8 +156,8 @@ async function sendAlert(status: string, errorMessage?: string) {
     `<b>Errors:</b> ${currentLog.errors.length}`,
     errorMessage ? `<b>Error:</b> <code>${escapeHtml(errorMessage.slice(0, 300))}</code>` : '',
     ``,
-    currentLog.errors.length > 0 
-      ? `<b>Recent errors:</b>\n${currentLog.errors.slice(-5).map(e => `• ${escapeHtml(e.artist)} - ${escapeHtml(e.album)}: ${escapeHtml(e.error)}`).join('\n')}`
+    (realErrors && realErrors.length > 0)
+      ? `<b>Recent errors:</b>\n${realErrors.slice(-5).map(e => `• ${escapeHtml(e.artist)} - ${escapeHtml(e.album)}: ${escapeHtml(e.error)}`).join('\n')}`
       : '',
   ].filter(Boolean).join('\n')
 
