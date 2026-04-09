@@ -23,6 +23,7 @@ export async function initDb() {
       image_url TEXT,
       release_year INT,
       spotify_id TEXT,
+      all_tracks TEXT[] NOT NULL DEFAULT '{}',
       UNIQUE(artist, album)
     );
 
@@ -35,6 +36,7 @@ export async function initDb() {
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS image_url TEXT`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS release_year INT`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS spotify_id TEXT`)
+  await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS all_tracks TEXT[] NOT NULL DEFAULT '{}'`)
   console.log('DB initialized')
 }
 
@@ -45,18 +47,19 @@ export async function saveStats(stats: AlbumStat[], totalTracks: number) {
     for (const s of stats) {
       await client.query(
         `INSERT INTO album_stats
-          (artist, album, total_tracks, listened_tracks, listened_count, percentage, complete, image_url, release_year, spotify_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          (artist, album, total_tracks, listened_tracks, all_tracks, listened_count, percentage, complete, image_url, release_year, spotify_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (artist, album) DO UPDATE SET
           total_tracks = EXCLUDED.total_tracks,
           listened_tracks = EXCLUDED.listened_tracks,
+          all_tracks = EXCLUDED.all_tracks,
           listened_count = EXCLUDED.listened_count,
           percentage = EXCLUDED.percentage,
           complete = EXCLUDED.complete,
           image_url = COALESCE(EXCLUDED.image_url, album_stats.image_url),
           release_year = COALESCE(EXCLUDED.release_year, album_stats.release_year),
           spotify_id = COALESCE(EXCLUDED.spotify_id, album_stats.spotify_id)`,
-        [s.artist, s.album, s.totalTracks, s.listenedTracks, s.listenedCount, s.percentage, s.complete, s.imageUrl ?? null, s.releaseYear ?? null, s.spotifyId ?? null]
+        [s.artist, s.album, s.totalTracks, s.listenedTracks, s.allTracks ?? [], s.listenedCount, s.percentage, s.complete, s.imageUrl ?? null, s.releaseYear ?? null, s.spotifyId ?? null]
       )
     }
     // Remove albums no longer in the current sync
@@ -148,6 +151,7 @@ export async function loadStats(): Promise<{
       album: r.album,
       totalTracks: r.total_tracks,
       listenedTracks: r.listened_tracks,
+      allTracks: (r as any).all_tracks ?? [],
       listenedCount: r.listened_count,
       percentage: r.percentage,
       complete: r.complete,

@@ -112,6 +112,7 @@ async function doRefresh(force = false) {
           artist: spotifyInfo.artist,
           totalTracks: spotifyInfo.totalTracks,
           listenedTracks: Array.from(listenedSet),
+          allTracks: spotifyInfo.tracks,
           listenedCount,
           percentage,
           complete: listenedCount >= spotifyInfo.totalTracks,
@@ -126,6 +127,7 @@ async function doRefresh(force = false) {
           artist,
           totalTracks: 0,  // Unknown
           listenedTracks: Array.from(listenedSet),
+          allTracks: [],
           listenedCount: listenedSet.size,
           percentage: 0,
           complete: false,
@@ -204,6 +206,7 @@ async function enrichMissingMetadata() {
         stat.releaseYear = info.releaseYear
         stat.imageUrl = info.imageUrl ?? stat.imageUrl
         stat.totalTracks = info.totalTracks
+        stat.allTracks = info.tracks
       }
       enriched++
     }

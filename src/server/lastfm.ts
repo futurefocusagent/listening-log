@@ -13,6 +13,7 @@ export interface AlbumStat {
   artist: string
   totalTracks: number
   listenedTracks: string[]
+  allTracks: string[]  // full tracklist from Spotify, empty if unknown
   listenedCount: number
   percentage: number
   complete: boolean
@@ -183,6 +184,7 @@ export async function buildAlbumStats(user: string, yearsBack = 10): Promise<{
         artist,
         totalTracks: 0,
         listenedTracks: Array.from(listenedSet),
+        allTracks: [],
         listenedCount: listenedSet.size,
         percentage: 0,
         complete: false,
@@ -200,6 +202,7 @@ export async function buildAlbumStats(user: string, yearsBack = 10): Promise<{
       artist: info.artist,
       totalTracks: info.totalTracks,
       listenedTracks: Array.from(listenedSet),
+      allTracks: info.tracks,
       listenedCount,
       percentage,
       complete: listenedCount >= info.totalTracks,
