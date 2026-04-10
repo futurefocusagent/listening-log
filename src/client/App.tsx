@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react'
 import Timeline from './Timeline'
 import AlbumModal from './AlbumModal'
 
-interface AlbumStat {
+export interface AlbumStat {
   album: string
   artist: string
   totalTracks: number
@@ -13,6 +13,15 @@ interface AlbumStat {
   imageUrl?: string
   spotifyId?: string
   releaseYear?: number
+  tier?: 'top' | 'mid' | 'low'
+  energy?: 'ambient' | 'moderate' | 'intense'
+  tags?: string[]
+}
+
+export interface Tag {
+  id: number
+  name: string
+  count: number
 }
 
 interface ApiResponse {
@@ -233,7 +242,25 @@ export default function App() {
 
       {/* Album detail modal */}
       {selectedAlbum && (
-        <AlbumModal album={selectedAlbum} onClose={() => setSelectedAlbum(null)} />
+        <AlbumModal 
+          album={selectedAlbum} 
+          onClose={() => setSelectedAlbum(null)}
+          onUpdate={(updated) => {
+            // Update both the selected album and the data array
+            setSelectedAlbum(prev => prev ? { ...prev, ...updated } : null)
+            setData(prev => {
+              if (!prev) return prev
+              return {
+                ...prev,
+                stats: prev.stats.map(s => 
+                  s.artist === selectedAlbum.artist && s.album === selectedAlbum.album
+                    ? { ...s, ...updated }
+                    : s
+                )
+              }
+            })
+          }}
+        />
       )}
     </div>
   )

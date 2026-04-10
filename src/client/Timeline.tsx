@@ -1,42 +1,109 @@
 import React, { useState, useRef, useMemo } from 'react'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
-
-interface AlbumStat {
-  album: string
-  artist: string
-  totalTracks: number
-  listenedTracks: string[]
-  listenedCount: number
-  percentage: number
-  complete: boolean
-  imageUrl?: string
-  releaseYear?: number
-}
+import { AlbumStat } from './App'
 
 interface Props {
   stats: AlbumStat[]
   onAlbumClick: (album: AlbumStat) => void
 }
 
-const COLS = 5
 const TILE_GAP = 8
 
 // Row types for the virtualised list
 type Row =
   | { kind: 'header'; year: number; albumCount: number; singleCount: number }
-  | { kind: 'tiles'; albums: AlbumStat[] }
+  | { kind: 'album-row'; albums: AlbumWithLayout[] }
   | { kind: 'singles-header'; count: number }
-  | { kind: 'single'; album: AlbumStat }
+  | { kind: 'singles-row'; singles: AlbumWithLayout[] }
+
+interface AlbumWithLayout extends AlbumStat {
+  cols: number  // 1, 2, or 3 out of 6
+}
 
 // Is this a single? (3 or fewer tracks)
 function isSingle(album: AlbumStat): boolean {
   return album.totalTracks > 0 && album.totalTracks <= 3
 }
 
+// Get column span based on tier
+function getTierCols(tier?: 'top' | 'mid' | 'low'): number {
+  switch (tier) {
+    case 'top': return 3
+    case 'mid': return 2
+    case 'low': return 1
+    default: return 2  // uncategorized defaults to mid
+  }
+}
+
+// Sort albums by tier: top first, then mid, then low, then uncategorized
+function sortByTier(albums: AlbumStat[]): AlbumStat[] {
+  const tierOrder = { top: 0, mid: 1, low: 2 }
+  return [...albums].sort((a, b) => {
+    const aOrder = a.tier ? tierOrder[a.tier] : 3
+    const bOrder = b.tier ? tierOrder[b.tier] : 3
+    return aOrder - bOrder
+  })
+}
+
+// Pack albums into rows respecting variable column widths
+function packIntoRows(albums: AlbumStat[], totalCols: number = 6): AlbumWithLayout[][] {
+  const sorted = sortByTier(albums)
+  const rows: AlbumWithLayout[][] = []
+  let currentRow: AlbumWithLayout[] = []
+  let currentCols = 0
+
+  for (const album of sorted) {
+    const cols = getTierCols(album.tier)
+    
+    if (currentCols + cols > totalCols) {
+      if (currentRow.length > 0) rows.push(currentRow)
+      currentRow = []
+      currentCols = 0
+    }
+    
+    currentRow.push({ ...album, cols })
+    currentCols += cols
+  }
+  
+  if (currentRow.length > 0) rows.push(currentRow)
+  return rows
+}
+
+// Pack singles into rows (smaller sizes)
+function packSinglesIntoRows(singles: AlbumStat[], totalCols: number = 6): AlbumWithLayout[][] {
+  const sorted = sortByTier(singles)
+  const rows: AlbumWithLayout[][] = []
+  let currentRow: AlbumWithLayout[] = []
+  let currentCols = 0
+
+  for (const album of sorted) {
+    // Singles use smaller sizes: top=2, mid=1.5 (round to 2), low=1
+    let cols: number
+    switch (album.tier) {
+      case 'top': cols = 2; break
+      case 'mid': cols = 1; break
+      case 'low': cols = 1; break
+      default: cols = 1
+    }
+    
+    if (currentCols + cols > totalCols) {
+      if (currentRow.length > 0) rows.push(currentRow)
+      currentRow = []
+      currentCols = 0
+    }
+    
+    currentRow.push({ ...album, cols })
+    currentCols += cols
+  }
+  
+  if (currentRow.length > 0) rows.push(currentRow)
+  return rows
+}
+
 export default function Timeline({ stats, onAlbumClick }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
 
-  // Build flat row list: header + tile-rows for albums, then singles list per year
+  // Build flat row list: header + packed album rows, then singles
   const rows = useMemo<Row[]>(() => {
     const byYear = new Map<number, { albums: AlbumStat[]; singles: AlbumStat[] }>()
     
@@ -60,16 +127,18 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
       // Year header
       result.push({ kind: 'header', year, albumCount: albums.length, singleCount: singles.length })
       
-      // Album grid (5-column tiles)
-      for (let i = 0; i < albums.length; i += COLS) {
-        result.push({ kind: 'tiles', albums: albums.slice(i, i + COLS) })
+      // Album grid (variable column widths based on tier)
+      const albumRows = packIntoRows(albums)
+      for (const row of albumRows) {
+        result.push({ kind: 'album-row', albums: row })
       }
       
-      // Singles section (compact list)
+      // Singles section
       if (singles.length > 0) {
         result.push({ kind: 'singles-header', count: singles.length })
-        for (const single of singles) {
-          result.push({ kind: 'single', album: single })
+        const singleRows = packSinglesIntoRows(singles)
+        for (const row of singleRows) {
+          result.push({ kind: 'singles-row', singles: row })
         }
       }
     }
@@ -82,9 +151,14 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
     estimateSize: (i) => {
       const row = rows[i]
       if (row.kind === 'header') return 52
-      if (row.kind === 'tiles') return 120
+      if (row.kind === 'album-row') {
+        // Height based on largest item in row
+        const maxCols = Math.max(...row.albums.map(a => a.cols))
+        // Approximate: 3-col = ~180px, 2-col = ~120px, 1-col = ~60px
+        return maxCols === 3 ? 180 : maxCols === 2 ? 120 : 80
+      }
       if (row.kind === 'singles-header') return 40
-      if (row.kind === 'single') return 44
+      if (row.kind === 'singles-row') return 70
       return 50
     },
     overscan: 5,
@@ -128,10 +202,10 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
                     {row.singleCount > 0 && `, ${row.singleCount} single${row.singleCount !== 1 ? 's' : ''}`}
                   </span>
                 </div>
-              ) : row.kind === 'tiles' ? (
+              ) : row.kind === 'album-row' ? (
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+                  gridTemplateColumns: 'repeat(6, 1fr)',
                   gap: TILE_GAP,
                   marginBottom: TILE_GAP,
                 }}>
@@ -152,8 +226,21 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
                 }}>
                   Singles & EPs
                 </div>
-              ) : row.kind === 'single' ? (
-                <SingleRow album={row.album} onClick={() => onAlbumClick(row.album)} />
+              ) : row.kind === 'singles-row' ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(6, 1fr)',
+                  gap: TILE_GAP,
+                  marginBottom: TILE_GAP,
+                }}>
+                  {row.singles.map(album => (
+                    <SingleTile
+                      key={`${album.artist}|||${album.album}`}
+                      album={album}
+                      onClick={() => onAlbumClick(album)}
+                    />
+                  ))}
+                </div>
               ) : null}
             </div>
           )
@@ -163,7 +250,7 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
   )
 }
 
-function AlbumTile({ album, onClick }: { album: AlbumStat; onClick: () => void }) {
+function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => void }) {
   const [imgError, setImgError] = useState(false)
 
   const barColor = album.complete ? '#22c55e'
@@ -171,6 +258,9 @@ function AlbumTile({ album, onClick }: { album: AlbumStat; onClick: () => void }
     : album.percentage >= 50 ? '#f59e0b'
     : album.percentage >= 25 ? '#f97316'
     : '#ef4444'
+
+  // Opacity based on tier (no tier = 50%)
+  const opacity = album.tier ? 1 : 0.5
 
   return (
     <div
@@ -184,6 +274,9 @@ function AlbumTile({ album, onClick }: { album: AlbumStat; onClick: () => void }
         cursor: 'pointer',
         background: '#1a1a1a',
         border: '1px solid #1e1e1e',
+        gridColumn: `span ${album.cols}`,
+        opacity,
+        transition: 'opacity 0.2s',
       }}
     >
       {album.imageUrl && !imgError ? (
@@ -215,11 +308,25 @@ function AlbumTile({ album, onClick }: { album: AlbumStat; onClick: () => void }
       }}>
         {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
       </div>
+
+      {/* Tier badge (top left) */}
+      {album.tier && (
+        <div style={{
+          position: 'absolute', top: 3, left: 3,
+          background: album.tier === 'top' ? '#22c55e' : album.tier === 'mid' ? '#f59e0b' : '#666',
+          borderRadius: 3, fontSize: 8, fontWeight: 700,
+          padding: '1px 4px', color: '#000', lineHeight: 1.4,
+          pointerEvents: 'none',
+          textTransform: 'uppercase',
+        }}>
+          {album.tier}
+        </div>
+      )}
     </div>
   )
 }
 
-function SingleRow({ album, onClick }: { album: AlbumStat; onClick: () => void }) {
+function SingleTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => void }) {
   const [imgError, setImgError] = useState(false)
 
   const barColor = album.complete ? '#22c55e'
@@ -228,57 +335,52 @@ function SingleRow({ album, onClick }: { album: AlbumStat; onClick: () => void }
     : album.percentage >= 25 ? '#f97316'
     : '#ef4444'
 
+  // Opacity based on tier (no tier = 50%)
+  const opacity = album.tier ? 1 : 0.5
+
   return (
     <div
       onClick={onClick}
+      title={`${album.album} — ${album.artist}`}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        padding: '6px 0',
-        cursor: 'pointer',
-        borderBottom: '1px solid #1a1a1a',
-      }}
-    >
-      {/* Square album cover as bullet */}
-      <div style={{
-        width: 32,
-        height: 32,
+        position: 'relative',
+        aspectRatio: '1',
         borderRadius: 4,
         overflow: 'hidden',
-        flexShrink: 0,
+        cursor: 'pointer',
         background: '#1a1a1a',
         border: '1px solid #1e1e1e',
-      }}>
-        {album.imageUrl && !imgError ? (
-          <img
-            src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
-            alt={album.album}
-            loading="lazy"
-            onError={() => setImgError(true)}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        ) : (
-          <div style={{
-            width: '100%', height: '100%',
-            background: '#222',
-          }} />
-        )}
-      </div>
+        gridColumn: `span ${album.cols}`,
+        opacity,
+        transition: 'opacity 0.2s',
+      }}
+    >
+      {album.imageUrl && !imgError ? (
+        <img
+          src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
+          alt={album.album}
+          loading="lazy"
+          onError={() => setImgError(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        <div style={{
+          width: '100%', height: '100%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 9, color: '#333', textAlign: 'center', padding: 4,
+          lineHeight: 1.2,
+        }}>
+          {album.album}
+        </div>
+      )}
 
-      {/* Artist - Title */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ color: '#888', fontSize: 13 }}>{album.artist}</span>
-        <span style={{ color: '#444', fontSize: 13 }}> — </span>
-        <span style={{ color: '#ccc', fontSize: 13 }}>{album.album}</span>
-      </div>
-
-      {/* Percentage justified right */}
+      {/* Completion badge */}
       <div style={{
-        fontSize: 12,
-        fontWeight: 600,
-        color: barColor,
-        flexShrink: 0,
+        position: 'absolute', bottom: 2, right: 2,
+        background: 'rgba(0,0,0,0.8)',
+        borderRadius: 2, fontSize: 8, fontWeight: 700,
+        padding: '1px 2px', color: barColor, lineHeight: 1.3,
+        pointerEvents: 'none',
       }}>
         {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
       </div>

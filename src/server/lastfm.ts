@@ -20,6 +20,9 @@ export interface AlbumStat {
   imageUrl?: string
   spotifyId?: string
   releaseYear?: number
+  tier?: 'top' | 'mid' | 'low'
+  energy?: 'ambient' | 'moderate' | 'intense'
+  tags?: string[]
 }
 
 async function lfmGet(params: Record<string, string>): Promise<unknown> {

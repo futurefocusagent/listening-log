@@ -2,7 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import path from 'path'
 import { getAllTracks, AlbumStat } from './lastfm.js'
-import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata } from './db.js'
+import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata, getAllTags, createTag, renameTag, deleteTag, addTagToAlbum, removeTagFromAlbum, getOrCreateTag, updateAlbumCategorization } from './db.js'
 import { searchAlbum as spotifySearchAlbum, SpotifyAlbumInfo } from './spotify.js'
 import { initLoggerDb, startSyncLog, updateSyncLog, logError, finishSyncLog, getRecentSyncLogs, getUnacknowledgedAlerts, acknowledgeAlert, acknowledgeAllAlerts } from './logger.js'
 
@@ -295,6 +295,113 @@ app.post('/api/alerts/:id/ack', async (req, res) => {
 
 app.post('/api/alerts/ack-all', async (_req, res) => {
   await acknowledgeAllAlerts()
+  res.json({ ok: true })
+})
+
+// ==================== TAG MANAGEMENT ====================
+
+app.get('/api/tags', async (_req, res) => {
+  const tags = await getAllTags()
+  res.json(tags)
+})
+
+app.post('/api/tags', async (req, res) => {
+  const { name } = req.body
+  if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name required' })
+  try {
+    const tag = await createTag(name)
+    res.json(tag)
+  } catch (err: any) {
+    if (err.code === '23505') return res.status(409).json({ error: 'tag already exists' })
+    throw err
+  }
+})
+
+app.put('/api/tags/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10)
+  const { name } = req.body
+  if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name required' })
+  try {
+    await renameTag(id, name)
+    res.json({ ok: true })
+  } catch (err: any) {
+    if (err.code === '23505') return res.status(409).json({ error: 'tag name already exists' })
+    throw err
+  }
+})
+
+app.delete('/api/tags/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10)
+  await deleteTag(id)
+  res.json({ ok: true })
+})
+
+// ==================== ALBUM CATEGORIZATION ====================
+
+app.put('/api/albums/:artist/:album/categorization', async (req, res) => {
+  const { artist, album } = req.params
+  const { tier, energy } = req.body
+  
+  // Validate tier
+  if (tier !== undefined && tier !== null && !['top', 'mid', 'low'].includes(tier)) {
+    return res.status(400).json({ error: 'tier must be top, mid, low, or null' })
+  }
+  // Validate energy
+  if (energy !== undefined && energy !== null && !['ambient', 'moderate', 'intense'].includes(energy)) {
+    return res.status(400).json({ error: 'energy must be ambient, moderate, intense, or null' })
+  }
+  
+  await updateAlbumCategorization(decodeURIComponent(artist), decodeURIComponent(album), { tier, energy })
+  
+  // Update in-memory state
+  const stat = state.stats.find(
+    s => s.artist.toLowerCase() === decodeURIComponent(artist).toLowerCase() &&
+         s.album.toLowerCase() === decodeURIComponent(album).toLowerCase()
+  )
+  if (stat) {
+    if (tier !== undefined) stat.tier = tier ?? undefined
+    if (energy !== undefined) stat.energy = energy ?? undefined
+  }
+  
+  res.json({ ok: true })
+})
+
+app.post('/api/albums/:artist/:album/tags', async (req, res) => {
+  const { artist, album } = req.params
+  const { tagName, tagId } = req.body
+  
+  let tag
+  if (tagId) {
+    tag = { id: tagId }
+  } else if (tagName) {
+    tag = await getOrCreateTag(tagName)
+  } else {
+    return res.status(400).json({ error: 'tagName or tagId required' })
+  }
+  
+  await addTagToAlbum(decodeURIComponent(artist), decodeURIComponent(album), tag.id)
+  
+  // Update in-memory state
+  const stat = state.stats.find(
+    s => s.artist.toLowerCase() === decodeURIComponent(artist).toLowerCase() &&
+         s.album.toLowerCase() === decodeURIComponent(album).toLowerCase()
+  )
+  if (stat) {
+    const name = tagName?.toLowerCase().trim() || ''
+    if (!stat.tags) stat.tags = []
+    if (name && !stat.tags.includes(name)) stat.tags.push(name)
+  }
+  
+  res.json({ ok: true, tag })
+})
+
+app.delete('/api/albums/:artist/:album/tags/:tagId', async (req, res) => {
+  const { artist, album, tagId } = req.params
+  await removeTagFromAlbum(decodeURIComponent(artist), decodeURIComponent(album), parseInt(tagId, 10))
+  
+  // Note: We'd need the tag name to remove from in-memory state properly
+  // For now, just return success and let the client refetch
+  
   res.json({ ok: true })
 })
 
