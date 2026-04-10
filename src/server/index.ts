@@ -343,8 +343,8 @@ app.put('/api/albums/:artist/:album/categorization', async (req, res) => {
   const { tier, energy } = req.body
   
   // Validate tier
-  if (tier !== undefined && tier !== null && !['top', 'mid', 'low'].includes(tier)) {
-    return res.status(400).json({ error: 'tier must be top, mid, low, or null' })
+  if (tier !== undefined && tier !== null && !['top', 'mid', 'low', 'hidden'].includes(tier)) {
+    return res.status(400).json({ error: 'tier must be top, mid, low, hidden, or null' })
   }
   // Validate energy
   if (energy !== undefined && energy !== null && !['ambient', 'moderate', 'intense'].includes(energy)) {

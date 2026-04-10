@@ -24,7 +24,7 @@ export async function initDb() {
       release_year INT,
       spotify_id TEXT,
       all_tracks TEXT[] NOT NULL DEFAULT '{}',
-      tier TEXT CHECK (tier IN ('top', 'mid', 'low')),
+      tier TEXT CHECK (tier IN ('top', 'mid', 'low', 'hidden')),
       energy TEXT CHECK (energy IN ('ambient', 'moderate', 'intense')),
       UNIQUE(artist, album)
     );
@@ -51,7 +51,10 @@ export async function initDb() {
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS release_year INT`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS spotify_id TEXT`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS all_tracks TEXT[] NOT NULL DEFAULT '{}'`)
-  await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS tier TEXT CHECK (tier IN ('top', 'mid', 'low'))`)
+  await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS tier TEXT`)
+  // Update constraint to include 'hidden'
+  await pool.query(`ALTER TABLE album_stats DROP CONSTRAINT IF EXISTS album_stats_tier_check`)
+  await pool.query(`ALTER TABLE album_stats ADD CONSTRAINT album_stats_tier_check CHECK (tier IN ('top', 'mid', 'low', 'hidden'))`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS energy TEXT CHECK (energy IN ('ambient', 'moderate', 'intense'))`)
   console.log('DB initialized')
 }
@@ -187,7 +190,7 @@ export async function loadStats(): Promise<{
       imageUrl: r.image_url ?? undefined,
       releaseYear: r.release_year ?? undefined,
       spotifyId: r.spotify_id ?? undefined,
-      tier: r.tier as 'top' | 'mid' | 'low' | undefined ?? undefined,
+      tier: r.tier as 'top' | 'mid' | 'low' | 'hidden' | undefined ?? undefined,
       energy: r.energy as 'ambient' | 'moderate' | 'intense' | undefined ?? undefined,
       tags: tagMap.get(`${r.artist}|||${r.album}`) ?? [],
     })),
@@ -257,7 +260,7 @@ export async function getOrCreateTag(name: string): Promise<Tag> {
 export async function updateAlbumCategorization(
   artist: string,
   album: string,
-  data: { tier?: 'top' | 'mid' | 'low' | null; energy?: 'ambient' | 'moderate' | 'intense' | null }
+  data: { tier?: 'top' | 'mid' | 'low' | 'hidden' | null; energy?: 'ambient' | 'moderate' | 'intense' | null }
 ): Promise<void> {
   const sets: string[] = []
   const values: (string | null)[] = []

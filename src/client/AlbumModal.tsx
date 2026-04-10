@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function AlbumModal({ album, onClose, onUpdate }: Props) {
-  const [tier, setTier] = useState<'top' | 'mid' | 'low' | undefined>(album.tier)
+  const [tier, setTier] = useState<'top' | 'mid' | 'low' | 'hidden' | undefined>(album.tier)
   const [energy, setEnergy] = useState<'ambient' | 'moderate' | 'intense' | undefined>(album.energy)
   const [tags, setTags] = useState<string[]>(album.tags ?? [])
   const [allTags, setAllTags] = useState<Tag[]>([])
@@ -41,6 +41,11 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
+  const handleTierChange = (newTier: 'top' | 'mid' | 'low' | 'hidden' | undefined) => {
+    setTier(newTier)
+    saveCategorization(newTier, undefined)
+  }
+
   const saveCategorization = useCallback(async (newTier?: typeof tier, newEnergy?: typeof energy) => {
     setSaving(true)
     try {
@@ -59,11 +64,6 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
       setSaving(false)
     }
   }, [album.artist, album.album, tier, energy, onUpdate])
-
-  const handleTierChange = (newTier: 'top' | 'mid' | 'low' | undefined) => {
-    setTier(newTier)
-    saveCategorization(newTier, undefined)
-  }
 
   const handleEnergyChange = (newEnergy: 'ambient' | 'moderate' | 'intense' | undefined) => {
     setEnergy(newEnergy)
@@ -198,7 +198,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                 Tier
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                {(['top', 'mid', 'low'] as const).map(t => (
+                {(['top', 'mid', 'low', 'hidden'] as const).map(t => (
                   <button
                     key={t}
                     onClick={() => handleTierChange(tier === t ? undefined : t)}
@@ -206,8 +206,8 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                     style={{
                       padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
                       fontSize: 12, fontWeight: 600, textTransform: 'uppercase',
-                      background: tier === t ? (t === 'top' ? '#22c55e' : t === 'mid' ? '#f59e0b' : '#666') : '#2a2a2a',
-                      color: tier === t ? '#000' : '#888',
+                      background: tier === t ? (t === 'top' ? '#22c55e' : t === 'mid' ? '#f59e0b' : t === 'low' ? '#666' : '#333') : '#2a2a2a',
+                      color: tier === t ? (t === 'hidden' ? '#888' : '#000') : '#888',
                       opacity: saving ? 0.5 : 1,
                     }}
                   >

@@ -13,7 +13,7 @@ export interface AlbumStat {
   imageUrl?: string
   spotifyId?: string
   releaseYear?: number
-  tier?: 'top' | 'mid' | 'low'
+  tier?: 'top' | 'mid' | 'low' | 'hidden'
   energy?: 'ambient' | 'moderate' | 'intense'
   tags?: string[]
 }
@@ -43,6 +43,8 @@ export default function App() {
   const [search, setSearch] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [selectedAlbum, setSelectedAlbum] = useState<AlbumStat | null>(null)
+  const [showHidden, setShowHidden] = useState(false)
+  const [showUncategorized, setShowUncategorized] = useState(false)
 
   useEffect(() => {
     fetch('/api/stats')
@@ -187,7 +189,40 @@ export default function App() {
 
       {/* Timeline view */}
       {data && !data.loading && view === 'timeline' && (
-        <Timeline stats={data.stats} onAlbumClick={setSelectedAlbum} />
+        <>
+          {/* Visibility toggles */}
+          <div style={{
+            display: 'flex', gap: 16, marginBottom: 16,
+            fontSize: 13, color: '#888',
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={showUncategorized}
+                onChange={e => setShowUncategorized(e.target.checked)}
+                style={{ accentColor: '#666' }}
+              />
+              Show uncategorized
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={showHidden}
+                onChange={e => setShowHidden(e.target.checked)}
+                style={{ accentColor: '#666' }}
+              />
+              Show hidden
+            </label>
+          </div>
+          <Timeline
+            stats={data.stats.filter(a => {
+              if (a.tier === 'hidden' && !showHidden) return false
+              if (!a.tier && !showUncategorized) return false
+              return true
+            })}
+            onAlbumClick={setSelectedAlbum}
+          />
+        </>
       )}
 
       {/* Progress view */}

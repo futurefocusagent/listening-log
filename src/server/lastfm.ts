@@ -20,7 +20,7 @@ export interface AlbumStat {
   imageUrl?: string
   spotifyId?: string
   releaseYear?: number
-  tier?: 'top' | 'mid' | 'low'
+  tier?: 'top' | 'mid' | 'low' | 'hidden'
   energy?: 'ambient' | 'moderate' | 'intense'
   tags?: string[]
 }
