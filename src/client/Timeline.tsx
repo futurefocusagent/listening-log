@@ -31,7 +31,7 @@ function getTierCols(tier?: 'top' | 'mid' | 'low'): number {
     case 'top': return 3
     case 'mid': return 2
     case 'low': return 1
-    default: return 2  // uncategorized defaults to mid
+    default: return 1  // uncategorized = small (same as low)
   }
 }
 
@@ -152,10 +152,12 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
       const row = rows[i]
       if (row.kind === 'header') return 52
       if (row.kind === 'album-row') {
-        // Height based on largest item in row
+        // Height based on largest item in row + space for labels
         const maxCols = Math.max(...row.albums.map(a => a.cols))
+        const hasLabels = row.albums.some(a => a.energy || (a.tags && a.tags.length > 0))
+        const labelSpace = hasLabels ? 24 : 0
         // Approximate: 3-col = ~180px, 2-col = ~120px, 1-col = ~60px
-        return maxCols === 3 ? 180 : maxCols === 2 ? 120 : 80
+        return (maxCols === 3 ? 180 : maxCols === 2 ? 120 : 80) + labelSpace
       }
       if (row.kind === 'singles-header') return 40
       if (row.kind === 'singles-row') return 70
@@ -224,7 +226,7 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px',
                 }}>
-                  Singles & EPs
+                  Singles
                 </div>
               ) : row.kind === 'singles-row' ? (
                 <div style={{
@@ -261,65 +263,106 @@ function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => 
 
   // Opacity based on tier (no tier = 50%)
   const opacity = album.tier ? 1 : 0.5
+  const hasLabels = album.energy || (album.tags && album.tags.length > 0)
 
   return (
     <div
       onClick={onClick}
       title={`${album.album} — ${album.artist}`}
       style={{
-        position: 'relative',
-        aspectRatio: '1',
-        borderRadius: 6,
-        overflow: 'hidden',
-        cursor: 'pointer',
-        background: '#1a1a1a',
-        border: '1px solid #1e1e1e',
         gridColumn: `span ${album.cols}`,
+        cursor: 'pointer',
         opacity,
         transition: 'opacity 0.2s',
       }}
     >
-      {album.imageUrl && !imgError ? (
-        <img
-          src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
-          alt={album.album}
-          loading="lazy"
-          onError={() => setImgError(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
-      ) : (
-        <div style={{
-          width: '100%', height: '100%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 10, color: '#333', textAlign: 'center', padding: 6,
-          lineHeight: 1.3,
-        }}>
-          {album.album}
-        </div>
-      )}
-
-      {/* Completion badge */}
+      {/* Thumbnail */}
       <div style={{
-        position: 'absolute', bottom: 3, right: 3,
-        background: 'rgba(0,0,0,0.8)',
-        borderRadius: 3, fontSize: 9, fontWeight: 700,
-        padding: '1px 3px', color: barColor, lineHeight: 1.4,
-        pointerEvents: 'none',
+        position: 'relative',
+        aspectRatio: '1',
+        borderRadius: 6,
+        overflow: 'hidden',
+        background: '#1a1a1a',
+        border: '1px solid #1e1e1e',
       }}>
-        {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
+        {album.imageUrl && !imgError ? (
+          <img
+            src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
+            alt={album.album}
+            loading="lazy"
+            onError={() => setImgError(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : (
+          <div style={{
+            width: '100%', height: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, color: '#333', textAlign: 'center', padding: 6,
+            lineHeight: 1.3,
+          }}>
+            {album.album}
+          </div>
+        )}
+
+        {/* Completion badge */}
+        <div style={{
+          position: 'absolute', bottom: 3, right: 3,
+          background: 'rgba(0,0,0,0.8)',
+          borderRadius: 3, fontSize: 9, fontWeight: 700,
+          padding: '1px 3px', color: barColor, lineHeight: 1.4,
+          pointerEvents: 'none',
+        }}>
+          {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
+        </div>
+
+        {/* Tier badge (top left) */}
+        {album.tier && (
+          <div style={{
+            position: 'absolute', top: 3, left: 3,
+            background: album.tier === 'top' ? '#22c55e' : album.tier === 'mid' ? '#f59e0b' : '#666',
+            borderRadius: 3, fontSize: 8, fontWeight: 700,
+            padding: '1px 4px', color: '#000', lineHeight: 1.4,
+            pointerEvents: 'none',
+            textTransform: 'uppercase',
+          }}>
+            {album.tier}
+          </div>
+        )}
       </div>
 
-      {/* Tier badge (top left) */}
-      {album.tier && (
+      {/* Labels below thumbnail */}
+      {hasLabels && (
         <div style={{
-          position: 'absolute', top: 3, left: 3,
-          background: album.tier === 'top' ? '#22c55e' : album.tier === 'mid' ? '#f59e0b' : '#666',
-          borderRadius: 3, fontSize: 8, fontWeight: 700,
-          padding: '1px 4px', color: '#000', lineHeight: 1.4,
-          pointerEvents: 'none',
-          textTransform: 'uppercase',
+          marginTop: 4,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 3,
+          fontSize: 9,
         }}>
-          {album.tier}
+          {album.energy && (
+            <span style={{
+              background: '#3b82f6',
+              color: '#fff',
+              padding: '1px 4px',
+              borderRadius: 3,
+              fontWeight: 600,
+            }}>
+              {album.energy}
+            </span>
+          )}
+          {album.tags?.map(tag => (
+            <span
+              key={tag}
+              style={{
+                background: '#333',
+                color: '#aaa',
+                padding: '1px 4px',
+                borderRadius: 3,
+              }}
+            >
+              {tag}
+            </span>
+          ))}
         </div>
       )}
     </div>
