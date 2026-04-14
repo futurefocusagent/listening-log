@@ -73,19 +73,21 @@ export default function App() {
     setRefreshing(false)
   }
 
+  const searchActive = search.trim().length > 0
+
   const filtered = useMemo(() => {
     if (!data?.stats) return []
     let list = data.stats
     if (filter === 'incomplete') list = list.filter(a => !a.complete)
     if (filter === 'complete') list = list.filter(a => a.complete)
-    if (search.trim()) {
+    if (searchActive) {
       const q = search.toLowerCase()
       list = list.filter(a =>
         a.album.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q)
       )
     }
     return list
-  }, [data, filter, search])
+  }, [data, filter, search, searchActive])
 
   const incompleteCount = data?.stats.filter(a => !a.complete).length ?? 0
   const completeCount = data?.stats.filter(a => a.complete).length ?? 0
@@ -187,6 +189,24 @@ export default function App() {
         <div style={{ textAlign: 'center', color: '#555', padding: 60 }}>Loading…</div>
       )}
 
+      {/* Search */}
+      {data && !data.loading && (
+        <div style={{ marginBottom: 20 }}>
+          <input
+            type="text"
+            placeholder="Search albums or artists…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: '#1a1a1a', border: '1px solid #333', color: '#e0e0e0',
+              borderRadius: 8, padding: '8px 14px', fontSize: 14,
+              outline: 'none',
+            }}
+          />
+        </div>
+      )}
+
       {/* Timeline view */}
       {data && !data.loading && view === 'timeline' && (
         <>
@@ -216,6 +236,10 @@ export default function App() {
           </div>
           <Timeline
             stats={data.stats.filter(a => {
+              if (searchActive) {
+                const q = search.toLowerCase()
+                return a.album.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q)
+              }
               if (a.tier === 'hidden' && !showHidden) return false
               if (!a.tier && !showUncategorized) return false
               return true
@@ -228,37 +252,24 @@ export default function App() {
       {/* Progress view */}
       {data && !data.loading && view === 'progress' && (
         <>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {(['incomplete', 'all', 'complete'] as FilterMode[]).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  style={{
-                    background: filter === f ? '#fff' : '#1a1a1a',
-                    color: filter === f ? '#000' : '#aaa',
-                    border: '1px solid #333', borderRadius: 6,
-                    padding: '6px 14px', cursor: 'pointer', fontSize: 13,
-                    fontWeight: filter === f ? 600 : 400,
-                  }}
-                >
-                  {f === 'incomplete' ? `Unfinished (${incompleteCount})`
-                    : f === 'complete' ? `Complete (${completeCount})`
-                    : `All (${data.stats.length})`}
-                </button>
-              ))}
-            </div>
-            <input
-              type="text"
-              placeholder="Search albums or artists…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{
-                background: '#1a1a1a', border: '1px solid #333', color: '#e0e0e0',
-                borderRadius: 6, padding: '6px 12px', fontSize: 13, flex: 1, minWidth: 200,
-                outline: 'none',
-              }}
-            />
+          <div style={{ display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap' }}>
+            {(['incomplete', 'all', 'complete'] as FilterMode[]).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                style={{
+                  background: filter === f ? '#fff' : '#1a1a1a',
+                  color: filter === f ? '#000' : '#aaa',
+                  border: '1px solid #333', borderRadius: 6,
+                  padding: '6px 14px', cursor: 'pointer', fontSize: 13,
+                  fontWeight: filter === f ? 600 : 400,
+                }}
+              >
+                {f === 'incomplete' ? `Unfinished (${incompleteCount})`
+                  : f === 'complete' ? `Complete (${completeCount})`
+                  : `All (${data.stats.length})`}
+              </button>
+            ))}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filtered.map(album => (
