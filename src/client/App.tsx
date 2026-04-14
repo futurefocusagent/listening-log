@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState } from 'react'
 import Timeline from './Timeline'
 import AlbumModal from './AlbumModal'
 
@@ -33,13 +33,8 @@ interface ApiResponse {
   fetchedAt: string | null
 }
 
-type View = 'timeline' | 'progress'
-type FilterMode = 'all' | 'incomplete' | 'complete'
-
 export default function App() {
   const [data, setData] = useState<ApiResponse | null>(null)
-  const [view, setView] = useState<View>('timeline')
-  const [filter, setFilter] = useState<FilterMode>('incomplete')
   const [search, setSearch] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [selectedAlbum, setSelectedAlbum] = useState<AlbumStat | null>(null)
@@ -75,20 +70,6 @@ export default function App() {
 
   const searchActive = search.trim().length > 0
 
-  const filtered = useMemo(() => {
-    if (!data?.stats) return []
-    let list = data.stats
-    if (filter === 'incomplete') list = list.filter(a => !a.complete)
-    if (filter === 'complete') list = list.filter(a => a.complete)
-    if (searchActive) {
-      const q = search.toLowerCase()
-      list = list.filter(a =>
-        a.album.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q)
-      )
-    }
-    return list
-  }, [data, filter, search, searchActive])
-
   const incompleteCount = data?.stats.filter(a => !a.complete).length ?? 0
   const completeCount = data?.stats.filter(a => a.complete).length ?? 0
 
@@ -101,21 +82,6 @@ export default function App() {
           <p style={{ color: '#666', fontSize: 13 }}>boytunewonder · album completion tracker</p>
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          {(['timeline', 'progress'] as View[]).map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              style={{
-                background: view === v ? '#fff' : '#1a1a1a',
-                color: view === v ? '#000' : '#aaa',
-                border: '1px solid #333', borderRadius: 6,
-                padding: '6px 14px', cursor: 'pointer', fontSize: 13,
-                fontWeight: view === v ? 600 : 400,
-              }}
-            >
-              {v === 'timeline' ? 'By Year' : 'Progress'}
-            </button>
-          ))}
           {data && !data.loading && (
             <button
               onClick={handleRefresh}
@@ -123,7 +89,6 @@ export default function App() {
               style={{
                 background: '#1a1a1a', border: '1px solid #333', color: '#666',
                 padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
-                marginLeft: 4,
               }}
             >
               {refreshing ? '…' : '↻'}
@@ -208,7 +173,7 @@ export default function App() {
       )}
 
       {/* Timeline view */}
-      {data && !data.loading && view === 'timeline' && (
+      {data && !data.loading && (
         <>
           {/* Visibility toggles */}
           <div style={{
@@ -249,43 +214,6 @@ export default function App() {
         </>
       )}
 
-      {/* Progress view */}
-      {data && !data.loading && view === 'progress' && (
-        <>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap' }}>
-            {(['incomplete', 'all', 'complete'] as FilterMode[]).map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                style={{
-                  background: filter === f ? '#fff' : '#1a1a1a',
-                  color: filter === f ? '#000' : '#aaa',
-                  border: '1px solid #333', borderRadius: 6,
-                  padding: '6px 14px', cursor: 'pointer', fontSize: 13,
-                  fontWeight: filter === f ? 600 : 400,
-                }}
-              >
-                {f === 'incomplete' ? `Unfinished (${incompleteCount})`
-                  : f === 'complete' ? `Complete (${completeCount})`
-                  : `All (${data.stats.length})`}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {filtered.map(album => (
-              <AlbumCard
-                key={`${album.artist}|||${album.album}`}
-                album={album}
-                onClick={() => setSelectedAlbum(album)}
-              />
-            ))}
-            {filtered.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#555', padding: 40 }}>No albums found</div>
-            )}
-          </div>
-        </>
-      )}
-
       {/* Album detail modal */}
       {selectedAlbum && (
         <AlbumModal 
@@ -321,92 +249,3 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
   )
 }
 
-function AlbumCard({ album, onClick }: { album: AlbumStat; onClick: () => void }) {
-  const [imgError, setImgError] = useState(false)
-
-  const barColor = album.complete ? '#22c55e'
-    : album.percentage >= 75 ? '#84cc16'
-    : album.percentage >= 50 ? '#f59e0b'
-    : album.percentage >= 25 ? '#f97316'
-    : '#ef4444'
-
-  return (
-    <div
-      style={{
-        background: '#1a1a1a',
-        border: `1px solid ${album.complete ? '#1a3a1a' : '#222'}`,
-        borderRadius: 10,
-        padding: '14px 16px',
-        cursor: 'pointer',
-      }}
-      onClick={onClick}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {/* Album art or ring */}
-        <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
-          {album.imageUrl && !imgError ? (
-            <img
-              src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
-              alt={album.album}
-              style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', display: 'block' }}
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <div style={{
-              width: 48, height: 48, borderRadius: '50%',
-              background: `conic-gradient(${barColor} ${album.percentage}%, #2a2a2a ${album.percentage}%)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: '50%', background: '#1a1a1a',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 11, fontWeight: 700, color: barColor,
-              }}>
-                {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
-              </div>
-            </div>
-          )}
-          {album.imageUrl && !imgError && (
-            <div style={{
-              position: 'absolute', bottom: -4, right: -4,
-              background: barColor, color: '#000',
-              borderRadius: 4, fontSize: 10, fontWeight: 700,
-              padding: '1px 4px', lineHeight: 1.4,
-            }}>
-              {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
-            </div>
-          )}
-        </div>
-
-        {/* Info */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontWeight: 600, fontSize: 15,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            {album.album}
-          </div>
-          <div style={{ color: '#888', fontSize: 13, marginTop: 2 }}>{album.artist}</div>
-        </div>
-
-        {/* Track count */}
-        <div style={{ textAlign: 'right', flexShrink: 0, fontSize: 13 }}>
-          <span style={{ color: barColor, fontWeight: 600 }}>{album.listenedCount}</span>
-          {album.totalTracks > 0 && <span style={{ color: '#555' }}>/{album.totalTracks}</span>}
-          <div style={{ color: '#555', fontSize: 12 }}>tracks</div>
-        </div>
-
-        {/* Spotify */}
-        <a
-          href={album.spotifyId
-            ? `spotify:album:${album.spotifyId}`
-            : `spotify:search:${encodeURIComponent(`${album.artist} ${album.album}`)}`
-          }
-          title="Open in Spotify"
-          onClick={e => e.stopPropagation()}
-          style={{ fontSize: 18, textDecoration: 'none', flexShrink: 0 }}
-        >🎧</a>
-      </div>
-    </div>
-  )
-}
