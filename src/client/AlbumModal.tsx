@@ -115,69 +115,51 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
   return (
     <div
       onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 100,
-        background: 'rgba(0,0,0,0.8)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24,
-      }}
+      className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-6"
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{
-          background: '#111', borderRadius: 12,
-          maxWidth: 480, width: '100%', maxHeight: '90vh',
-          overflow: 'auto', position: 'relative',
-          border: '1px solid #2a2a2a',
-        }}
+        className="bg-[#111] rounded-xl max-w-[480px] w-full max-h-[90vh] overflow-auto relative border border-[#2a2a2a]"
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          style={{
-            position: 'absolute', top: 12, right: 12, zIndex: 2,
-            background: 'rgba(0,0,0,0.6)', border: 'none', color: '#aaa',
-            fontSize: 18, cursor: 'pointer', lineHeight: 1,
-            width: 28, height: 28, borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
+          className="absolute top-3 right-3 z-[2] bg-black/60 border-none text-[#aaa] text-lg cursor-pointer leading-none w-7 h-7 rounded-full flex items-center justify-center"
         >✕</button>
 
         {/* Full-width album cover */}
         {album.imageUrl && (
-          <div style={{ width: '100%', aspectRatio: '1', overflow: 'hidden', borderRadius: '12px 12px 0 0' }}>
+          <div className="w-full aspect-square overflow-hidden rounded-t-xl">
             <img
               src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
               alt={album.album}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              className="w-full h-full object-cover block"
             />
           </div>
         )}
 
         {/* Info + controls */}
-        <div style={{ padding: '20px 24px 24px' }}>
+        <div className="px-6 pt-5 pb-6">
           {/* Title + artist */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 20, lineHeight: 1.2, marginBottom: 4 }}>{album.album}</div>
-            <div style={{ color: '#888', fontSize: 14 }}>{album.artist}</div>
+          <div className="mb-3">
+            <div className="font-bold text-xl leading-tight mb-1">{album.album}</div>
+            <div className="text-[#888] text-sm">{album.artist}</div>
           </div>
 
           {/* Stats row */}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-              background: `conic-gradient(${barColor} ${album.percentage}%, #2a2a2a ${album.percentage}%)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <div style={{
-                width: 30, height: 30, borderRadius: '50%', background: '#111',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 9, fontWeight: 700, color: barColor,
-              }}>
+          <div className="flex gap-3 items-center mb-5">
+            <div
+              className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center"
+              style={{ background: `conic-gradient(${barColor} ${album.percentage}%, #2a2a2a ${album.percentage}%)` }}
+            >
+              <div
+                className="w-[30px] h-[30px] rounded-full bg-[#111] flex items-center justify-center text-[9px] font-bold"
+                style={{ color: barColor }}
+              >
                 {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
               </div>
             </div>
-            <span style={{ fontSize: 13, color: '#888' }}>
+            <span className="text-[13px] text-[#888]">
               {album.listenedCount}{album.totalTracks > 0 ? `/${album.totalTracks}` : ''} tracks listened
             </span>
             <a
@@ -186,30 +168,31 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                 : `spotify:search:${encodeURIComponent(`${album.artist} ${album.album}`)}`
               }
               title="Open in Spotify"
-              style={{ fontSize: 18, textDecoration: 'none', marginLeft: 'auto' }}
+              className="text-lg no-underline ml-auto"
             >🎧</a>
           </div>
 
           {/* Categorization section */}
-          <div style={{ marginBottom: 20, padding: 16, background: '#1a1a1a', borderRadius: 8 }}>
+          <div className="mb-5 p-4 bg-[#1a1a1a] rounded-lg">
             {/* Tier */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+            <div className="mb-4">
+              <div className="text-[11px] text-[#555] uppercase tracking-[0.08em] mb-2">
                 Tier
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="flex gap-1.5">
                 {(['top', 'mid', 'low', 'hidden'] as const).map(t => (
                   <button
                     key={t}
                     onClick={() => handleTierChange(tier === t ? undefined : t)}
                     disabled={saving}
-                    style={{
-                      padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                      fontSize: 12, fontWeight: 600, textTransform: 'uppercase',
-                      background: tier === t ? (t === 'top' ? '#22c55e' : t === 'mid' ? '#f59e0b' : t === 'low' ? '#666' : '#333') : '#2a2a2a',
-                      color: tier === t ? (t === 'hidden' ? '#888' : '#000') : '#888',
-                      opacity: saving ? 0.5 : 1,
-                    }}
+                    className={`px-3.5 py-1.5 rounded-md border-none cursor-pointer text-xs font-bold uppercase ${saving ? 'opacity-50' : ''} ${
+                      tier === t
+                        ? t === 'top' ? 'bg-[#22c55e] text-black'
+                          : t === 'mid' ? 'bg-[#f59e0b] text-black'
+                          : t === 'low' ? 'bg-[#666] text-black'
+                          : 'bg-[#333] text-[#888]'
+                        : 'bg-[#2a2a2a] text-[#888]'
+                    }`}
                   >
                     {t}
                   </button>
@@ -218,23 +201,17 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
             </div>
 
             {/* Energy */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+            <div className="mb-4">
+              <div className="text-[11px] text-[#555] uppercase tracking-[0.08em] mb-2">
                 Energy
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="flex gap-1.5">
                 {(['ambient', 'moderate', 'intense'] as const).map(e => (
                   <button
                     key={e}
                     onClick={() => handleEnergyChange(energy === e ? undefined : e)}
                     disabled={saving}
-                    style={{
-                      padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                      fontSize: 12, fontWeight: 600,
-                      background: energy === e ? '#3b82f6' : '#2a2a2a',
-                      color: energy === e ? '#fff' : '#888',
-                      opacity: saving ? 0.5 : 1,
-                    }}
+                    className={`px-3.5 py-1.5 rounded-md border-none cursor-pointer text-xs font-bold ${saving ? 'opacity-50' : ''} ${energy === e ? 'bg-[#3b82f6] text-white' : 'bg-[#2a2a2a] text-[#888]'}`}
                   >
                     {e}
                   </button>
@@ -244,38 +221,31 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
 
             {/* Tags */}
             <div>
-              <div style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+              <div className="text-[11px] text-[#555] uppercase tracking-[0.08em] mb-2">
                 Tags
               </div>
-              
+
               {/* Current tags */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
                 {tags.map(tag => (
                   <span
                     key={tag}
-                    style={{
-                      padding: '4px 8px', borderRadius: 4, fontSize: 11,
-                      background: '#333', color: '#ccc',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}
+                    className="px-2 py-1 rounded text-[11px] bg-[#333] text-[#ccc] flex items-center gap-1.5"
                   >
                     {tag}
                     <button
                       onClick={() => removeTag(tag)}
-                      style={{
-                        background: 'none', border: 'none', color: '#888',
-                        cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1,
-                      }}
+                      className="bg-transparent border-none text-[#888] cursor-pointer text-xs p-0 leading-none"
                     >×</button>
                   </span>
                 ))}
                 {tags.length === 0 && (
-                  <span style={{ fontSize: 12, color: '#555' }}>No tags yet</span>
+                  <span className="text-xs text-[#555]">No tags yet</span>
                 )}
               </div>
 
               {/* Add tag input */}
-              <div style={{ position: 'relative' }}>
+              <div className="relative">
                 <input
                   type="text"
                   placeholder="Add tag..."
@@ -286,32 +256,19 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                       addTag(newTagInput)
                     }
                   }}
-                  style={{
-                    width: '100%', padding: '8px 12px', borderRadius: 6,
-                    border: '1px solid #333', background: '#222', color: '#e0e0e0',
-                    fontSize: 13, outline: 'none',
-                  }}
+                  className="w-full px-3 py-2 rounded-md border border-[#333] bg-[#222] text-[#e0e0e0] text-[13px] outline-none"
                 />
                 {/* Autocomplete suggestions */}
                 {newTagInput && suggestions.length > 0 && (
-                  <div style={{
-                    position: 'absolute', top: '100%', left: 0, right: 0,
-                    background: '#222', border: '1px solid #333', borderRadius: 6,
-                    marginTop: 4, overflow: 'hidden', zIndex: 10,
-                  }}>
+                  <div className="absolute top-full left-0 right-0 bg-[#222] border border-[#333] rounded-md mt-1 overflow-hidden z-10">
                     {suggestions.map(tag => (
                       <div
                         key={tag.id}
                         onClick={() => addTag(tag.name)}
-                        style={{
-                          padding: '8px 12px', cursor: 'pointer', fontSize: 13,
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#2a2a2a')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        className="px-3 py-2 cursor-pointer text-[13px] flex justify-between items-center hover:bg-[#2a2a2a]"
                       >
-                        <span style={{ color: '#ccc' }}>{tag.name}</span>
-                        <span style={{ color: '#555', fontSize: 11 }}>{tag.count} albums</span>
+                        <span className="text-[#ccc]">{tag.name}</span>
+                        <span className="text-[#555] text-[11px]">{tag.count} albums</span>
                       </div>
                     ))}
                   </div>
@@ -323,30 +280,25 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
           {/* Tracklist */}
           {trackList.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+              <div className="text-[11px] text-[#555] uppercase tracking-[0.08em] mb-2.5">
                 Tracklist
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div className="flex flex-col gap-0.5">
                 {trackList.map((track: string, i: number) => {
                   const heard = listenedSet.has(track.toLowerCase())
                   return (
                     <div
                       key={track}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '6px 0',
-                        opacity: heard ? 1 : 0.35,
-                        borderBottom: '1px solid #1a1a1a',
-                      }}
+                      className={`flex items-center gap-3 py-1.5 border-b border-[#1a1a1a] ${heard ? 'opacity-100' : 'opacity-[0.35]'}`}
                     >
-                      <span style={{ fontSize: 11, color: '#555', width: 18, textAlign: 'right', flexShrink: 0 }}>
+                      <span className="text-[11px] text-[#555] w-[18px] text-right shrink-0">
                         {i + 1}
                       </span>
-                      <span style={{ fontSize: 13, color: heard ? '#e0e0e0' : '#888', lineHeight: 1.3 }}>
+                      <span className={`text-[13px] leading-[1.3] ${heard ? 'text-[#e0e0e0]' : 'text-[#888]'}`}>
                         {track}
                       </span>
                       {heard && (
-                        <span style={{ marginLeft: 'auto', fontSize: 10, color: barColor, flexShrink: 0 }}>✓</span>
+                        <span className="ml-auto text-[10px] shrink-0" style={{ color: barColor }}>✓</span>
                       )}
                     </div>
                   )

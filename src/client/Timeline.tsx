@@ -7,8 +7,6 @@ interface Props {
   onAlbumClick: (album: AlbumStat) => void
 }
 
-const TILE_GAP = 8
-
 // Row types for the virtualised list
 type Row =
   | { kind: 'header'; year: number; albumCount: number; singleCount: number }
@@ -170,10 +168,8 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
   return (
     <div ref={listRef}>
       <div
-        style={{
-          height: virtualiser.getTotalSize(),
-          position: 'relative',
-        }}
+        className="relative"
+        style={{ height: virtualiser.getTotalSize() }}
       >
         {virtualiser.getVirtualItems().map(vItem => {
           const row = rows[vItem.index]
@@ -182,35 +178,19 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
               key={vItem.key}
               data-index={vItem.index}
               ref={virtualiser.measureElement}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${vItem.start - virtualiser.options.scrollMargin}px)`,
-              }}
+              className="absolute top-0 left-0 w-full"
+              style={{ transform: `translateY(${vItem.start - virtualiser.options.scrollMargin}px)` }}
             >
               {row.kind === 'header' ? (
-                <div style={{
-                  fontSize: 20, fontWeight: 700, color: '#555',
-                  padding: '20px 0 8px',
-                  borderBottom: '1px solid #1e1e1e',
-                  marginBottom: 8,
-                  display: 'flex', alignItems: 'baseline', gap: 10,
-                }}>
+                <div className="text-xl font-bold text-[#555] pt-5 pb-2 border-b border-[#1e1e1e] mb-2 flex items-baseline gap-2.5">
                   {row.year === 0 ? 'Unknown' : row.year}
-                  <span style={{ fontSize: 12, fontWeight: 400, color: '#333' }}>
+                  <span className="text-xs font-normal text-[#333]">
                     {row.albumCount} album{row.albumCount !== 1 ? 's' : ''}
                     {row.singleCount > 0 && `, ${row.singleCount} single${row.singleCount !== 1 ? 's' : ''}`}
                   </span>
                 </div>
               ) : row.kind === 'album-row' ? (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(6, 1fr)',
-                  gap: TILE_GAP,
-                  marginBottom: TILE_GAP,
-                }}>
+                <div className="grid grid-cols-6 gap-2 mb-2">
                   {row.albums.map(album => (
                     <AlbumTile
                       key={`${album.artist}|||${album.album}`}
@@ -220,21 +200,11 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
                   ))}
                 </div>
               ) : row.kind === 'singles-header' ? (
-                <div style={{
-                  fontSize: 13, fontWeight: 600, color: '#444',
-                  padding: '16px 0 8px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                }}>
+                <div className="text-[13px] font-semibold text-[#444] pt-4 pb-2 uppercase tracking-[0.5px]">
                   Singles
                 </div>
               ) : row.kind === 'singles-row' ? (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(6, 1fr)',
-                  gap: TILE_GAP,
-                  marginBottom: TILE_GAP,
-                }}>
+                <div className="grid grid-cols-6 gap-2 mb-2">
                   {row.singles.map(album => (
                     <SingleTile
                       key={`${album.artist}|||${album.album}`}
@@ -261,70 +231,45 @@ function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => 
     : album.percentage >= 25 ? '#f97316'
     : '#ef4444'
 
-  // Opacity based on tier (no tier = 50%)
-  const opacity = album.tier ? 1 : 0.5
   const hasLabels = album.energy || (album.tags && album.tags.length > 0)
+
+  const spanClass = ({ 1: 'col-span-1', 2: 'col-span-2', 3: 'col-span-3' } as Record<number, string>)[album.cols] ?? 'col-span-1'
 
   return (
     <div
       onClick={onClick}
       title={`${album.album} — ${album.artist}`}
-      style={{
-        gridColumn: `span ${album.cols}`,
-        cursor: 'pointer',
-        opacity,
-        transition: 'opacity 0.2s',
-      }}
+      className={`${spanClass} cursor-pointer transition-opacity duration-200 ${album.tier ? 'opacity-100' : 'opacity-50'}`}
     >
       {/* Thumbnail */}
-      <div style={{
-        position: 'relative',
-        aspectRatio: '1',
-        borderRadius: 6,
-        overflow: 'hidden',
-        background: '#1a1a1a',
-        border: '1px solid #1e1e1e',
-      }}>
+      <div className="relative aspect-square rounded-md overflow-hidden bg-[#1a1a1a] border border-[#1e1e1e]">
         {album.imageUrl && !imgError ? (
           <img
             src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
             alt={album.album}
             loading="lazy"
             onError={() => setImgError(true)}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            className="w-full h-full object-cover block"
           />
         ) : (
-          <div style={{
-            width: '100%', height: '100%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, color: '#333', textAlign: 'center', padding: 6,
-            lineHeight: 1.3,
-          }}>
+          <div className="w-full h-full flex items-center justify-center text-[10px] text-[#333] text-center p-1.5 leading-[1.3]">
             {album.album}
           </div>
         )}
 
         {/* Completion badge */}
-        <div style={{
-          position: 'absolute', bottom: 3, right: 3,
-          background: 'rgba(0,0,0,0.8)',
-          borderRadius: 3, fontSize: 9, fontWeight: 700,
-          padding: '1px 3px', color: barColor, lineHeight: 1.4,
-          pointerEvents: 'none',
-        }}>
+        <div
+          className="absolute bottom-[3px] right-[3px] bg-black/80 rounded-[3px] text-[9px] font-bold px-[3px] py-px leading-[1.4] pointer-events-none"
+          style={{ color: barColor }}
+        >
           {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
         </div>
 
         {/* Tier badge (top left) */}
         {album.tier && (
-          <div style={{
-            position: 'absolute', top: 3, left: 3,
-            background: album.tier === 'top' ? '#22c55e' : album.tier === 'mid' ? '#f59e0b' : '#666',
-            borderRadius: 3, fontSize: 8, fontWeight: 700,
-            padding: '1px 4px', color: '#000', lineHeight: 1.4,
-            pointerEvents: 'none',
-            textTransform: 'uppercase',
-          }}>
+          <div className={`absolute top-[3px] left-[3px] rounded-[3px] text-[8px] font-bold px-1 py-px text-black leading-[1.4] pointer-events-none uppercase ${
+            album.tier === 'top' ? 'bg-[#22c55e]' : album.tier === 'mid' ? 'bg-[#f59e0b]' : 'bg-[#666]'
+          }`}>
             {album.tier}
           </div>
         )}
@@ -332,33 +277,16 @@ function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => 
 
       {/* Labels below thumbnail */}
       {hasLabels && (
-        <div style={{
-          marginTop: 4,
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 3,
-          fontSize: 9,
-        }}>
+        <div className="mt-1 flex flex-wrap gap-[3px] text-[9px]">
           {album.energy && (
-            <span style={{
-              background: '#3b82f6',
-              color: '#fff',
-              padding: '1px 4px',
-              borderRadius: 3,
-              fontWeight: 600,
-            }}>
+            <span className="bg-[#3b82f6] text-white px-1 py-px rounded-[3px] font-semibold">
               {album.energy}
             </span>
           )}
           {album.tags?.map(tag => (
             <span
               key={tag}
-              style={{
-                background: '#333',
-                color: '#aaa',
-                padding: '1px 4px',
-                borderRadius: 3,
-              }}
+              className="bg-[#333] text-[#aaa] px-1 py-px rounded-[3px]"
             >
               {tag}
             </span>
@@ -378,25 +306,13 @@ function SingleTile({ album, onClick }: { album: AlbumWithLayout; onClick: () =>
     : album.percentage >= 25 ? '#f97316'
     : '#ef4444'
 
-  // Opacity based on tier (no tier = 50%)
-  const opacity = album.tier ? 1 : 0.5
+  const spanClass = ({ 1: 'col-span-1', 2: 'col-span-2', 3: 'col-span-3' } as Record<number, string>)[album.cols] ?? 'col-span-1'
 
   return (
     <div
       onClick={onClick}
       title={`${album.album} — ${album.artist}`}
-      style={{
-        position: 'relative',
-        aspectRatio: '1',
-        borderRadius: 4,
-        overflow: 'hidden',
-        cursor: 'pointer',
-        background: '#1a1a1a',
-        border: '1px solid #1e1e1e',
-        gridColumn: `span ${album.cols}`,
-        opacity,
-        transition: 'opacity 0.2s',
-      }}
+      className={`${spanClass} relative aspect-square rounded-[4px] overflow-hidden cursor-pointer bg-[#1a1a1a] border border-[#1e1e1e] transition-opacity duration-200 ${album.tier ? 'opacity-100' : 'opacity-50'}`}
     >
       {album.imageUrl && !imgError ? (
         <img
@@ -404,27 +320,19 @@ function SingleTile({ album, onClick }: { album: AlbumWithLayout; onClick: () =>
           alt={album.album}
           loading="lazy"
           onError={() => setImgError(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          className="w-full h-full object-cover block"
         />
       ) : (
-        <div style={{
-          width: '100%', height: '100%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 9, color: '#333', textAlign: 'center', padding: 4,
-          lineHeight: 1.2,
-        }}>
+        <div className="w-full h-full flex items-center justify-center text-[9px] text-[#333] text-center p-1 leading-[1.2]">
           {album.album}
         </div>
       )}
 
       {/* Completion badge */}
-      <div style={{
-        position: 'absolute', bottom: 2, right: 2,
-        background: 'rgba(0,0,0,0.8)',
-        borderRadius: 2, fontSize: 8, fontWeight: 700,
-        padding: '1px 2px', color: barColor, lineHeight: 1.3,
-        pointerEvents: 'none',
-      }}>
+      <div
+        className="absolute bottom-0.5 right-0.5 bg-black/80 rounded-[2px] text-[8px] font-bold px-[2px] py-px leading-[1.3] pointer-events-none"
+        style={{ color: barColor }}
+      >
         {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
       </div>
     </div>
