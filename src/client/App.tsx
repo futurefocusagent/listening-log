@@ -155,7 +155,9 @@ export default function App() {
       )}
 
       {/* Now Playing */}
-      {data && !data.loading && <NowPlaying />}
+      {data && !data.loading && (
+        <NowPlaying albums={data.stats} onAlbumClick={setSelectedAlbum} />
+      )}
 
       {/* Search */}
       {data && !data.loading && (
@@ -261,7 +263,12 @@ interface NowPlayingTrack {
   duration: number
 }
 
-function NowPlaying() {
+interface NowPlayingProps {
+  albums: AlbumStat[]
+  onAlbumClick: (album: AlbumStat) => void
+}
+
+function NowPlaying({ albums, onAlbumClick }: NowPlayingProps) {
   const [track, setTrack] = useState<NowPlayingTrack | null>(null)
 
   useEffect(() => {
@@ -282,37 +289,48 @@ function NowPlaying() {
 
   const pct = track.duration > 0 ? Math.min(100, (track.progress / track.duration) * 100) : 0
 
+  const matchedAlbum = track
+    ? albums.find(a =>
+        a.artist.toLowerCase() === track.artist.toLowerCase() &&
+        a.album.toLowerCase() === track.album.toLowerCase()
+      )
+    : null
+
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
       background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8,
-      padding: '8px 12px', marginBottom: 20,
+      padding: '12px', marginBottom: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
     }}>
       {track.albumArt && (
         <img
           src={track.albumArt}
           alt=""
-          style={{ width: 40, height: 40, borderRadius: 4, flexShrink: 0, objectFit: 'cover' }}
+          onClick={matchedAlbum ? () => onAlbumClick(matchedAlbum) : undefined}
+          style={{
+            width: '66%', aspectRatio: '1 / 1', borderRadius: 6,
+            objectFit: 'cover', display: 'block',
+            cursor: matchedAlbum ? 'pointer' : 'default',
+          }}
         />
       )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 10, color: '#1db954', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 1 }}>
+      <div style={{ width: '100%' }}>
+        <div style={{ fontSize: 10, color: '#1db954', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 2, textAlign: 'center' }}>
           NOW PLAYING
         </div>
         <div style={{
-          fontSize: 13, fontWeight: 600, color: '#e0e0e0',
+          fontSize: 14, fontWeight: 600, color: '#e0e0e0', textAlign: 'center',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {track.name}
         </div>
         <div style={{
-          fontSize: 12, color: '#888',
+          fontSize: 12, color: '#888', textAlign: 'center',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {track.artist}
         </div>
         {track.duration > 0 && (
-          <div style={{ marginTop: 4, height: 2, background: '#2a2a2a', borderRadius: 1 }}>
+          <div style={{ marginTop: 6, height: 2, background: '#2a2a2a', borderRadius: 1 }}>
             <div style={{ width: `${pct}%`, height: '100%', background: '#1db954', borderRadius: 1 }} />
           </div>
         )}
