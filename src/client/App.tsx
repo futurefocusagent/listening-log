@@ -299,7 +299,7 @@ function NowPlaying({ albums, onAlbumClick }: NowPlayingProps) {
   return (
     <div style={{
       background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8,
-      padding: '12px', marginBottom: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+      padding: '12px', marginBottom: 20, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12,
     }}>
       {track.albumArt && (
         <img
@@ -307,24 +307,24 @@ function NowPlaying({ albums, onAlbumClick }: NowPlayingProps) {
           alt=""
           onClick={matchedAlbum ? () => onAlbumClick(matchedAlbum) : undefined}
           style={{
-            width: '66%', aspectRatio: '1 / 1', borderRadius: 6,
+            width: 110, height: 110, borderRadius: 6, flexShrink: 0,
             objectFit: 'cover', display: 'block',
             cursor: matchedAlbum ? 'pointer' : 'default',
           }}
         />
       )}
-      <div style={{ width: '100%' }}>
-        <div style={{ fontSize: 10, color: '#1db954', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 2, textAlign: 'center' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10, color: '#1db954', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 2 }}>
           NOW PLAYING
         </div>
         <div style={{
-          fontSize: 14, fontWeight: 600, color: '#e0e0e0', textAlign: 'center',
+          fontSize: 14, fontWeight: 600, color: '#e0e0e0',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {track.name}
         </div>
         <div style={{
-          fontSize: 12, color: '#888', textAlign: 'center',
+          fontSize: 12, color: '#888',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {track.artist}
