@@ -453,7 +453,7 @@ app.get('/api/spotify/auth', (_req, res) => {
     client_id: process.env.SPOTIFY_CLIENT_ID!,
     response_type: 'code',
     redirect_uri: SPOTIFY_REDIRECT_URI,
-    scope: 'user-read-currently-playing user-read-playback-state',
+    scope: 'user-read-currently-playing user-read-playback-state user-modify-playback-state',
   })
   res.redirect(`https://accounts.spotify.com/authorize?${params}`)
 })
@@ -537,6 +537,40 @@ app.get('/api/now-playing', async (_req, res) => {
   } catch (err) {
     console.error('now-playing error:', err)
     res.json({ playing: false })
+  }
+})
+
+app.post('/api/spotify/play', async (req, res) => {
+  const { spotifyId } = req.body
+  if (!spotifyId || typeof spotifyId !== 'string') {
+    return res.status(400).json({ error: 'spotifyId required' })
+  }
+
+  try {
+    const accessToken = await getSpotifyAccessToken()
+    if (!accessToken) return res.status(401).json({ error: 'Spotify not connected' })
+
+    const playRes = await fetch('https://api.spotify.com/v1/me/player/play', {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ context_uri: `spotify:album:${spotifyId}` }),
+    })
+
+    if (playRes.status === 204 || playRes.ok) {
+      return res.json({ ok: true })
+    }
+
+    if (playRes.status === 404) {
+      return res.status(404).json({ error: 'No active Spotify device found. Open Spotify on a device first.' })
+    }
+
+    return res.status(playRes.status).json({ error: 'Spotify playback failed' })
+  } catch (err) {
+    console.error('spotify/play error:', err)
+    res.status(500).json({ error: 'Internal error' })
   }
 })
 

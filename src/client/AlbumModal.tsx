@@ -14,6 +14,8 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [newTagInput, setNewTagInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const [playMsg, setPlayMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   const barColor = album.complete ? '#22c55e'
     : album.percentage >= 75 ? '#84cc16'
@@ -112,6 +114,30 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
     .filter(t => !tags.includes(t.name) && t.name.includes(newTagInput.toLowerCase()))
     .slice(0, 5)
 
+  const handlePlay = async () => {
+    if (!album.spotifyId || playing) return
+    setPlaying(true)
+    setPlayMsg(null)
+    try {
+      const res = await fetch('/api/spotify/play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spotifyId: album.spotifyId }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setPlayMsg({ text: 'Playing!', ok: true })
+      } else {
+        setPlayMsg({ text: data.error || 'Playback failed', ok: false })
+      }
+    } catch {
+      setPlayMsg({ text: 'Network error', ok: false })
+    } finally {
+      setPlaying(false)
+      setTimeout(() => setPlayMsg(null), 3000)
+    }
+  }
+
   return (
     <div
       onClick={onClose}
@@ -162,15 +188,32 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
             <span className="text-[13px] text-[#888]">
               {album.listenedCount}{album.totalTracks > 0 ? `/${album.totalTracks}` : ''} tracks listened
             </span>
-            <a
-              href={album.spotifyId
-                ? `spotify:album:${album.spotifyId}`
-                : `spotify:search:${encodeURIComponent(`${album.artist} ${album.album}`)}`
-              }
-              title="Open in Spotify"
-              className="text-lg no-underline ml-auto"
-            >🎧</a>
+            <div className="ml-auto flex items-center gap-2">
+              {album.spotifyId && (
+                <button
+                  onClick={handlePlay}
+                  disabled={playing}
+                  title="Play album in Spotify"
+                  className="text-lg bg-transparent border-none cursor-pointer p-0 leading-none disabled:opacity-50"
+                >
+                  {playing ? '⏳' : '▶️'}
+                </button>
+              )}
+              <a
+                href={album.spotifyId
+                  ? `spotify:album:${album.spotifyId}`
+                  : `spotify:search:${encodeURIComponent(`${album.artist} ${album.album}`)}`
+                }
+                title="Open in Spotify"
+                className="text-lg no-underline"
+              >🎧</a>
+            </div>
           </div>
+          {playMsg && (
+            <div className={`text-xs mb-3 px-3 py-1.5 rounded-md ${playMsg.ok ? 'bg-[#14532d] text-[#86efac]' : 'bg-[#450a0a] text-[#fca5a5]'}`}>
+              {playMsg.text}
+            </div>
+          )}
 
           {/* Categorization section */}
           <div className="mb-5 p-4 bg-[#1a1a1a] rounded-lg">
