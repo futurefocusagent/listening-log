@@ -154,6 +154,9 @@ export default function App() {
         <div style={{ textAlign: 'center', color: '#555', padding: 60 }}>Loading…</div>
       )}
 
+      {/* Now Playing */}
+      {data && !data.loading && <NowPlaying />}
+
       {/* Search */}
       {data && !data.loading && (
         <div style={{ marginBottom: 20 }}>
@@ -245,6 +248,75 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
     <div>
       <div style={{ fontSize: 18, fontWeight: 700, color: color || '#e0e0e0' }}>{value}</div>
       <div style={{ fontSize: 12, color: '#555' }}>{label}</div>
+    </div>
+  )
+}
+
+interface NowPlayingTrack {
+  name: string
+  artist: string
+  album: string
+  albumArt: string | null
+  progress: number
+  duration: number
+}
+
+function NowPlaying() {
+  const [track, setTrack] = useState<NowPlayingTrack | null>(null)
+
+  useEffect(() => {
+    const poll = () => {
+      fetch('/api/now-playing')
+        .then(r => r.json())
+        .then((d: { playing: boolean; track?: NowPlayingTrack }) => {
+          setTrack(d.playing && d.track ? d.track : null)
+        })
+        .catch(() => {})
+    }
+    poll()
+    const interval = setInterval(poll, 15000)
+    return () => clearInterval(interval)
+  }, [])
+
+  if (!track) return null
+
+  const pct = track.duration > 0 ? Math.min(100, (track.progress / track.duration) * 100) : 0
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8,
+      padding: '8px 12px', marginBottom: 20,
+    }}>
+      {track.albumArt && (
+        <img
+          src={track.albumArt}
+          alt=""
+          style={{ width: 40, height: 40, borderRadius: 4, flexShrink: 0, objectFit: 'cover' }}
+        />
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10, color: '#1db954', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 1 }}>
+          NOW PLAYING
+        </div>
+        <div style={{
+          fontSize: 13, fontWeight: 600, color: '#e0e0e0',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {track.name}
+        </div>
+        <div style={{
+          fontSize: 12, color: '#888',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {track.artist}
+        </div>
+        {track.duration > 0 && (
+          <div style={{ marginTop: 4, height: 2, background: '#2a2a2a', borderRadius: 1 }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: '#1db954', borderRadius: 1 }} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

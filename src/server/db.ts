@@ -255,6 +255,23 @@ export async function getOrCreateTag(name: string): Promise<Tag> {
   return createTag(normalized)
 }
 
+// ==================== SETTINGS (key-value) ====================
+
+export async function getSetting(key: string): Promise<string | null> {
+  const result = await pool.query<{ value: string }>(
+    `SELECT value FROM sync_meta WHERE key = $1`, [key]
+  )
+  return result.rows[0]?.value ?? null
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO sync_meta (key, value) VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [key, value]
+  )
+}
+
 // ==================== ALBUM CATEGORIZATION ====================
 
 export async function updateAlbumCategorization(

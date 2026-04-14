@@ -2,7 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import path from 'path'
 import { getAllTracks, AlbumStat } from './lastfm.js'
-import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata, getAllTags, createTag, renameTag, deleteTag, addTagToAlbum, removeTagFromAlbum, getOrCreateTag, updateAlbumCategorization } from './db.js'
+import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata, getAllTags, createTag, renameTag, deleteTag, addTagToAlbum, removeTagFromAlbum, getOrCreateTag, updateAlbumCategorization, getSetting, setSetting } from './db.js'
 import { searchAlbum as spotifySearchAlbum, SpotifyAlbumInfo } from './spotify.js'
 import { initLoggerDb, startSyncLog, updateSyncLog, logError, finishSyncLog, getRecentSyncLogs, getUnacknowledgedAlerts, acknowledgeAlert, acknowledgeAllAlerts } from './logger.js'
 
@@ -403,6 +403,141 @@ app.delete('/api/albums/:artist/:album/tags/:tagId', async (req, res) => {
   // For now, just return success and let the client refetch
   
   res.json({ ok: true })
+})
+
+// ==================== SPOTIFY NOW PLAYING ====================
+
+const SPOTIFY_REDIRECT_URI = process.env.NODE_ENV === 'production'
+  ? 'https://listening-log.onrender.com/api/spotify/callback'
+  : 'http://localhost:3000/api/spotify/callback'
+
+// Cached access token to avoid refreshing every 15 seconds
+let spotifyAccessToken: string | null = null
+let spotifyAccessTokenExpiry = 0
+
+async function getSpotifyAccessToken(): Promise<string | null> {
+  if (spotifyAccessToken && Date.now() < spotifyAccessTokenExpiry) {
+    return spotifyAccessToken
+  }
+
+  const refreshToken = await getSetting('spotify_refresh_token')
+  if (!refreshToken) return null
+
+  const creds = Buffer.from(
+    `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
+  ).toString('base64')
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${creds}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
+  })
+
+  if (!res.ok) return null
+
+  const data = await res.json() as { access_token: string; expires_in: number }
+  spotifyAccessToken = data.access_token
+  // Expire 60s early to be safe
+  spotifyAccessTokenExpiry = Date.now() + (data.expires_in - 60) * 1000
+  return spotifyAccessToken
+}
+
+app.get('/api/spotify/auth', (_req, res) => {
+  const params = new URLSearchParams({
+    client_id: process.env.SPOTIFY_CLIENT_ID!,
+    response_type: 'code',
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+    scope: 'user-read-currently-playing user-read-playback-state',
+  })
+  res.redirect(`https://accounts.spotify.com/authorize?${params}`)
+})
+
+app.get('/api/spotify/callback', async (req, res) => {
+  const { code, error } = req.query as { code?: string; error?: string }
+
+  if (error || !code) {
+    return res.status(400).send(`Spotify auth error: ${error || 'missing code'}`)
+  }
+
+  const creds = Buffer.from(
+    `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
+  ).toString('base64')
+
+  try {
+    const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${creds}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: SPOTIFY_REDIRECT_URI,
+      }),
+    })
+
+    if (!tokenRes.ok) return res.status(500).send('Failed to exchange code for token')
+
+    const { refresh_token } = await tokenRes.json() as { refresh_token: string }
+    await setSetting('spotify_refresh_token', refresh_token)
+
+    // Clear cached access token so next request refreshes
+    spotifyAccessToken = null
+
+    res.send('<html><body style="font-family:sans-serif;background:#111;color:#e0e0e0;padding:40px;text-align:center"><h2>Spotify connected!</h2><p>You can close this window.</p></body></html>')
+  } catch (err) {
+    console.error('Spotify callback error:', err)
+    res.status(500).send('Internal error during Spotify auth')
+  }
+})
+
+app.get('/api/now-playing', async (_req, res) => {
+  try {
+    const accessToken = await getSpotifyAccessToken()
+    if (!accessToken) return res.json({ playing: false })
+
+    const trackRes = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+
+    if (trackRes.status === 204) return res.json({ playing: false })
+    if (!trackRes.ok) return res.json({ playing: false })
+
+    const data = await trackRes.json() as {
+      is_playing: boolean
+      progress_ms: number
+      item: {
+        name: string
+        duration_ms: number
+        artists: Array<{ name: string }>
+        album: { name: string; images: Array<{ url: string }> }
+      } | null
+    }
+
+    if (!data.is_playing || !data.item) return res.json({ playing: false })
+
+    res.json({
+      playing: true,
+      track: {
+        name: data.item.name,
+        artist: data.item.artists.map(a => a.name).join(', '),
+        album: data.item.album.name,
+        albumArt: data.item.album.images[0]?.url ?? null,
+        progress: data.progress_ms,
+        duration: data.item.duration_ms,
+      },
+    })
+  } catch (err) {
+    console.error('now-playing error:', err)
+    res.json({ playing: false })
+  }
 })
 
 // Proxy album art — avoids hotlinking, caches in memory
