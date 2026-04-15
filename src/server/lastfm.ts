@@ -155,6 +155,45 @@ export async function getAlbumInfo(artist: string, album: string): Promise<{
   }
 }
 
+export async function getAlbumTopTags(artist: string, album: string): Promise<string[]> {
+  try {
+    const data = await lfmGet({
+      method: 'album.getTopTags',
+      artist,
+      album,
+    }) as {
+      toptags?: { tag?: Array<{ name: string; count: number }> | { name: string; count: number } }
+      error?: number
+    }
+
+    if (data.error || !data.toptags?.tag) return []
+    const raw = data.toptags.tag
+    const tags = Array.isArray(raw) ? raw : [raw]
+    return tags.map(t => t.name.toLowerCase())
+  } catch {
+    return []
+  }
+}
+
+export async function getArtistTopTags(artist: string): Promise<string[]> {
+  try {
+    const data = await lfmGet({
+      method: 'artist.getTopTags',
+      artist,
+    }) as {
+      toptags?: { tag?: Array<{ name: string; count: number }> | { name: string; count: number } }
+      error?: number
+    }
+
+    if (data.error || !data.toptags?.tag) return []
+    const raw = data.toptags.tag
+    const tags = Array.isArray(raw) ? raw : [raw]
+    return tags.map(t => t.name.toLowerCase())
+  } catch {
+    return []
+  }
+}
+
 export async function buildAlbumStats(user: string, yearsBack = 10): Promise<{
   stats: AlbumStat[]
   totalTracks: number

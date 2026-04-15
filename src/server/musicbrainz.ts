@@ -20,6 +20,36 @@ async function mbGet(path: string, params: Record<string, string>): Promise<unkn
   return res.json()
 }
 
+export async function getMbAlbumTags(artist: string, album: string): Promise<string[]> {
+  try {
+    // Step 1: Find the release-group MBID
+    const searchData = await mbGet('/release-group/', {
+      query: `artist:"${artist}" release:"${album}"`,
+      limit: '3',
+    }) as {
+      'release-groups'?: Array<{ id: string; title: string; score?: number }>
+    }
+
+    const groups = searchData['release-groups'] ?? []
+    if (groups.length === 0) return []
+
+    const mbid = groups[0].id
+
+    // Step 2: Fetch tags for that release-group
+    const tagData = await mbGet(`/release-group/${mbid}`, {
+      inc: 'tags',
+    }) as {
+      tags?: Array<{ name: string; count: number }>
+    }
+
+    return (tagData.tags ?? [])
+      .sort((a, b) => b.count - a.count)
+      .map(t => t.name.toLowerCase())
+  } catch {
+    return []
+  }
+}
+
 export async function getReleaseYear(artist: string, album: string): Promise<number | null> {
   try {
     const data = await mbGet('/release/', {

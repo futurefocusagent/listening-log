@@ -13,6 +13,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
   const [tags, setTags] = useState<string[]>(album.tags ?? [])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [newTagInput, setNewTagInput] = useState('')
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [playMsg, setPlayMsg] = useState<{ text: string; ok: boolean } | null>(null)
@@ -35,6 +36,14 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
       .then(setAllTags)
       .catch(console.error)
   }, [])
+
+  // Fetch suggested tags from MusicBrainz + Last.fm when modal opens
+  useEffect(() => {
+    fetch(`/api/albums/${encodeURIComponent(album.artist)}/${encodeURIComponent(album.album)}/suggested-tags`)
+      .then(r => r.json())
+      .then(data => setSuggestedTags(data.tags ?? []))
+      .catch(console.error)
+  }, [album.artist, album.album])
 
   // Close on Escape
   useEffect(() => {
@@ -317,6 +326,25 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                   </div>
                 )}
               </div>
+
+              {/* Suggested tags */}
+              {suggestedTags.filter(t => !tags.includes(t)).length > 0 && (
+                <div className="mt-2.5">
+                  <div className="text-[10px] text-[#444] uppercase tracking-[0.08em] mb-1.5">Suggested</div>
+                  <div className="flex flex-wrap gap-1">
+                    {suggestedTags.filter(t => !tags.includes(t)).map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => addTag(tag)}
+                        className="px-2 py-0.5 rounded text-[11px] bg-[#1a1a1a] border border-[#2a2a2a] text-[#555] hover:text-[#aaa] hover:border-[#444] cursor-pointer transition-colors flex items-center gap-1"
+                      >
+                        <span className="text-[#3a3a3a]">+</span>
+                        <span>{tag}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

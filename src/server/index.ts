@@ -1,9 +1,10 @@
 import 'dotenv/config'
 import express from 'express'
 import path from 'path'
-import { getAllTracks, AlbumStat } from './lastfm.js'
+import { getAllTracks, AlbumStat, getAlbumTopTags, getArtistTopTags } from './lastfm.js'
 import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata, getAllTags, createTag, renameTag, deleteTag, addTagToAlbum, removeTagFromAlbum, getOrCreateTag, updateAlbumCategorization, getSetting, setSetting } from './db.js'
 import { searchAlbum as spotifySearchAlbum, SpotifyAlbumInfo } from './spotify.js'
+import { getMbAlbumTags } from './musicbrainz.js'
 import { initLoggerDb, startSyncLog, updateSyncLog, logError, finishSyncLog, getRecentSyncLogs, getUnacknowledgedAlerts, acknowledgeAlert, acknowledgeAllAlerts } from './logger.js'
 
 const app = express()
@@ -403,6 +404,46 @@ app.delete('/api/albums/:artist/:album/tags/:tagId', async (req, res) => {
   // For now, just return success and let the client refetch
   
   res.json({ ok: true })
+})
+
+// ==================== SUGGESTED TAGS ====================
+
+const suggestedTagsCache = new Map<string, { tags: string[]; ts: number }>()
+const SUGGESTED_TAGS_TTL = 5 * 60 * 1000 // 5 minutes
+
+app.get('/api/albums/:artist/:album/suggested-tags', async (req, res) => {
+  const artist = decodeURIComponent(req.params.artist)
+  const album = decodeURIComponent(req.params.album)
+
+  const cacheKey = `${artist.toLowerCase()}|||${album.toLowerCase()}`
+  const cached = suggestedTagsCache.get(cacheKey)
+  if (cached && Date.now() - cached.ts < SUGGESTED_TAGS_TTL) {
+    return res.json({ tags: cached.tags })
+  }
+
+  // Fetch from Last.fm (album + artist tags) and MusicBrainz in parallel
+  // Note: MB internally rate-limits to 1 req/sec and makes 2 sequential requests
+  const [lfmAlbumTags, lfmArtistTags, mbTags] = await Promise.all([
+    getAlbumTopTags(artist, album),
+    getArtistTopTags(artist),
+    getMbAlbumTags(artist, album),
+  ])
+
+  // Combine: Last.fm album tags first (most specific), then MB tags, then Last.fm artist tags
+  const seen = new Set<string>()
+  const combined: string[] = []
+  for (const tag of [...lfmAlbumTags, ...mbTags, ...lfmArtistTags]) {
+    const lower = tag.toLowerCase().trim()
+    if (lower && !seen.has(lower)) {
+      seen.add(lower)
+      combined.push(lower)
+    }
+  }
+
+  const top8 = combined.slice(0, 8)
+  suggestedTagsCache.set(cacheKey, { tags: top8, ts: Date.now() })
+
+  res.json({ tags: top8 })
 })
 
 // ==================== SPOTIFY NOW PLAYING ====================
