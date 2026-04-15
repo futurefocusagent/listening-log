@@ -100,6 +100,20 @@ function packSinglesIntoRows(singles: AlbumStat[], totalCols: number = 6): Album
 
 export default function Timeline({ stats, onAlbumClick }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
+  const yearRefs = useRef<Map<number, number>>(new Map()) // year -> row index
+
+  // Compute year stats for nav bar (albums with tiers set)
+  const yearStats = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const s of stats) {
+      if (s.tier) { // only count albums with a tier set
+        const year = s.releaseYear ?? 0
+        counts.set(year, (counts.get(year) ?? 0) + 1)
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[0] - a[0]) // descending by year
+  }, [stats])
 
   // Build flat row list: header + packed album rows, then singles
   const rows = useMemo<Row[]>(() => {
@@ -121,6 +135,9 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
     
     for (const year of years) {
       const { albums, singles } = byYear.get(year)!
+      
+      // Track row index for this year header
+      yearRefs.current.set(year, result.length)
       
       // Year header
       result.push({ kind: 'header', year, albumCount: albums.length, singleCount: singles.length })
@@ -165,8 +182,44 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
     scrollMargin: listRef.current?.offsetTop ?? 0,
   })
 
+  const scrollToYear = (year: number) => {
+    const rowIndex = yearRefs.current.get(year)
+    if (rowIndex !== undefined) {
+      // Calculate approximate scroll position
+      let scrollPos = 0
+      for (let i = 0; i < rowIndex; i++) {
+        const row = rows[i]
+        if (row.kind === 'header') scrollPos += 52
+        else if (row.kind === 'album-row') {
+          const maxCols = Math.max(...row.albums.map(a => a.cols))
+          scrollPos += (maxCols === 3 ? 180 : maxCols === 2 ? 120 : 80) + 24
+        }
+        else if (row.kind === 'singles-header') scrollPos += 40
+        else if (row.kind === 'singles-row') scrollPos += 70
+      }
+      window.scrollTo({ top: scrollPos, behavior: 'smooth' })
+    }
+  }
+
   return (
     <div ref={listRef}>
+      {/* Year navigation bar */}
+      {yearStats.length > 0 && (
+        <div className="sticky top-0 z-10 bg-[#0f0f0f]/95 backdrop-blur-sm border-b border-[#1e1e1e] py-2 mb-4 -mx-4 px-4">
+          <div className="flex flex-wrap gap-1.5">
+            {yearStats.map(([year, count]) => (
+              <button
+                key={year}
+                onClick={() => scrollToYear(year)}
+                className="bg-[#1a1a1a] hover:bg-[#252525] border border-[#333] rounded px-2 py-1 text-xs text-[#888] hover:text-[#ccc] transition-colors"
+              >
+                <span className="text-[#aaa]">{year === 0 ? '?' : year}</span>
+                <span className="text-[#555] ml-1">({count})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div
         className="relative"
         style={{ height: virtualiser.getTotalSize() }}
