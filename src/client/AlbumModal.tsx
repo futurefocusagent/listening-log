@@ -179,6 +179,9 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
           <div className="mb-3">
             <div className="font-bold text-xl leading-tight mb-1">{album.album}</div>
             <div className="text-[#888] text-sm">{album.artist}</div>
+            {album.releaseYear && (
+              <div className="text-[#555] text-xs mt-0.5">{album.releaseYear}</div>
+            )}
           </div>
 
           {/* Stats row */}
