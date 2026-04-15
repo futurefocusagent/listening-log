@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function AlbumModal({ album, onClose, onUpdate }: Props) {
-  const [tier, setTier] = useState<'top' | 'mid' | 'low' | 'hidden' | undefined>(album.tier)
+  const [tier, setTier] = useState<'top' | 'mid' | 'low' | 'hidden' | 'bookmarked' | undefined>(album.tier)
   const [energy, setEnergy] = useState<'ambient' | 'moderate' | 'intense' | undefined>(album.energy)
   const [tags, setTags] = useState<string[]>(album.tags ?? [])
   const [allTags, setAllTags] = useState<Tag[]>([])
@@ -52,7 +52,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  const handleTierChange = (newTier: 'top' | 'mid' | 'low' | 'hidden' | undefined) => {
+  const handleTierChange = (newTier: 'top' | 'mid' | 'low' | 'hidden' | 'bookmarked' | undefined) => {
     setTier(newTier)
     saveCategorization(newTier, undefined)
   }
@@ -234,8 +234,8 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
               <div className="text-[11px] text-[#555] uppercase tracking-[0.08em] mb-2">
                 Tier
               </div>
-              <div className="flex gap-1.5">
-                {(['top', 'mid', 'low', 'hidden'] as const).map(t => (
+              <div className="flex gap-1.5 flex-wrap">
+                {(['top', 'mid', 'low', 'hidden', 'bookmarked'] as const).map(t => (
                   <button
                     key={t}
                     onClick={() => handleTierChange(tier === t ? undefined : t)}
@@ -245,11 +245,12 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                         ? t === 'top' ? 'bg-[#22c55e] text-black'
                           : t === 'mid' ? 'bg-[#f59e0b] text-black'
                           : t === 'low' ? 'bg-[#666] text-black'
+                          : t === 'bookmarked' ? 'bg-[#d4a574] text-black'
                           : 'bg-[#333] text-[#888]'
                         : 'bg-[#2a2a2a] text-[#888]'
                     }`}
                   >
-                    {t}
+                    {t === 'bookmarked' ? '🔖' : t}
                   </button>
                 ))}
               </div>

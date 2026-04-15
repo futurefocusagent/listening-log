@@ -54,7 +54,7 @@ export async function initDb() {
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS tier TEXT`)
   // Update constraint to include 'hidden'
   await pool.query(`ALTER TABLE album_stats DROP CONSTRAINT IF EXISTS album_stats_tier_check`)
-  await pool.query(`ALTER TABLE album_stats ADD CONSTRAINT album_stats_tier_check CHECK (tier IN ('top', 'mid', 'low', 'hidden'))`)
+  await pool.query(`ALTER TABLE album_stats ADD CONSTRAINT album_stats_tier_check CHECK (tier IN ('top', 'mid', 'low', 'hidden', 'bookmarked'))`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS energy TEXT CHECK (energy IN ('ambient', 'moderate', 'intense'))`)
   console.log('DB initialized')
 }
@@ -190,7 +190,7 @@ export async function loadStats(): Promise<{
       imageUrl: r.image_url ?? undefined,
       releaseYear: r.release_year ?? undefined,
       spotifyId: r.spotify_id ?? undefined,
-      tier: r.tier as 'top' | 'mid' | 'low' | 'hidden' | undefined ?? undefined,
+      tier: r.tier as 'top' | 'mid' | 'low' | 'hidden' | 'bookmarked' | undefined ?? undefined,
       energy: r.energy as 'ambient' | 'moderate' | 'intense' | undefined ?? undefined,
       tags: tagMap.get(`${r.artist}|||${r.album}`) ?? [],
     })),
@@ -277,7 +277,7 @@ export async function setSetting(key: string, value: string): Promise<void> {
 export async function updateAlbumCategorization(
   artist: string,
   album: string,
-  data: { tier?: 'top' | 'mid' | 'low' | 'hidden' | null; energy?: 'ambient' | 'moderate' | 'intense' | null }
+  data: { tier?: 'top' | 'mid' | 'low' | 'hidden' | 'bookmarked' | null; energy?: 'ambient' | 'moderate' | 'intense' | null }
 ): Promise<void> {
   const sets: string[] = []
   const values: (string | null)[] = []

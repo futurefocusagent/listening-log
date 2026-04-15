@@ -11,6 +11,8 @@ interface Props {
 // Row types for the virtualised list
 type Row =
   | { kind: 'header'; year: number; albumCount: number; singleCount: number }
+  | { kind: 'bookmarked-header'; count: number }
+  | { kind: 'bookmarked-row'; albums: AlbumWithLayout[] }
   | { kind: 'album-row'; albums: AlbumWithLayout[] }
   | { kind: 'singles-header'; count: number }
   | { kind: 'singles-row'; singles: AlbumWithLayout[] }
@@ -25,23 +27,50 @@ function isSingle(album: AlbumStat): boolean {
 }
 
 // Get column span based on tier
-function getTierCols(tier?: 'top' | 'mid' | 'low'): number {
+function getTierCols(tier?: string): number {
   switch (tier) {
     case 'top': return 3
     case 'mid': return 2
     case 'low': return 1
-    default: return 1  // uncategorized = small (same as low)
+    default: return 1  // uncategorized / bookmarked = small (same as low)
   }
 }
 
 // Sort albums by tier: top first, then mid, then low, then uncategorized
 function sortByTier(albums: AlbumStat[]): AlbumStat[] {
-  const tierOrder = { top: 0, mid: 1, low: 2 }
+  const tierOrder: Record<string, number> = { top: 0, mid: 1, low: 2 }
   return [...albums].sort((a, b) => {
-    const aOrder = a.tier ? tierOrder[a.tier] : 3
-    const bOrder = b.tier ? tierOrder[b.tier] : 3
+    const aOrder = a.tier && tierOrder[a.tier] !== undefined ? tierOrder[a.tier] : 3
+    const bOrder = b.tier && tierOrder[b.tier] !== undefined ? tierOrder[b.tier] : 3
     return aOrder - bOrder
   })
+}
+
+// Sort bookmarked albums by play count desc, then alphabetically
+function sortBookmarked(albums: AlbumStat[]): AlbumStat[] {
+  return [...albums].sort((a, b) => {
+    if (b.listenedCount !== a.listenedCount) return b.listenedCount - a.listenedCount
+    return a.album.localeCompare(b.album)
+  })
+}
+
+// Pack bookmarked albums into rows (all 1-col)
+function packBookmarkedIntoRows(albums: AlbumStat[], totalCols: number = 6): AlbumWithLayout[][] {
+  const sorted = sortBookmarked(albums)
+  const rows: AlbumWithLayout[][] = []
+  let currentRow: AlbumWithLayout[] = []
+  let currentCols = 0
+  for (const album of sorted) {
+    if (currentCols + 1 > totalCols) {
+      if (currentRow.length > 0) rows.push(currentRow)
+      currentRow = []
+      currentCols = 0
+    }
+    currentRow.push({ ...album, cols: 1 })
+    currentCols += 1
+  }
+  if (currentRow.length > 0) rows.push(currentRow)
+  return rows
 }
 
 // Pack albums into rows respecting variable column widths
@@ -118,39 +147,50 @@ export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
       .sort((a, b) => b[0] - a[0]) // descending by year
   }, [allStats])
 
-  // Build flat row list: header + packed album rows, then singles
+  // Build flat row list: header + bookmarked section + packed album rows, then singles
   const rows = useMemo<Row[]>(() => {
-    const byYear = new Map<number, { albums: AlbumStat[]; singles: AlbumStat[] }>()
-    
+    const byYear = new Map<number, { bookmarked: AlbumStat[]; albums: AlbumStat[]; singles: AlbumStat[] }>()
+
     for (const s of stats) {
       const year = s.releaseYear ?? 0
-      if (!byYear.has(year)) byYear.set(year, { albums: [], singles: [] })
+      if (!byYear.has(year)) byYear.set(year, { bookmarked: [], albums: [], singles: [] })
       const bucket = byYear.get(year)!
-      if (isSingle(s)) {
+      if (s.tier === 'bookmarked') {
+        bucket.bookmarked.push(s)
+      } else if (isSingle(s)) {
         bucket.singles.push(s)
       } else {
         bucket.albums.push(s)
       }
     }
-    
+
     const years = Array.from(byYear.keys()).sort((a, b) => b - a)
     const result: Row[] = []
-    
+
     for (const year of years) {
-      const { albums, singles } = byYear.get(year)!
-      
+      const { bookmarked, albums, singles } = byYear.get(year)!
+
       // Track row index for this year header
       yearRefs.current.set(year, result.length)
-      
+
       // Year header
-      result.push({ kind: 'header', year, albumCount: albums.length, singleCount: singles.length })
-      
+      result.push({ kind: 'header', year, albumCount: albums.length + bookmarked.length, singleCount: singles.length })
+
+      // Bookmarked section (before regular albums)
+      if (bookmarked.length > 0) {
+        result.push({ kind: 'bookmarked-header', count: bookmarked.length })
+        const bookmarkedRows = packBookmarkedIntoRows(bookmarked)
+        for (const row of bookmarkedRows) {
+          result.push({ kind: 'bookmarked-row', albums: row })
+        }
+      }
+
       // Album grid (variable column widths based on tier)
       const albumRows = packIntoRows(albums)
       for (const row of albumRows) {
         result.push({ kind: 'album-row', albums: row })
       }
-      
+
       // Singles section
       if (singles.length > 0) {
         result.push({ kind: 'singles-header', count: singles.length })
@@ -160,7 +200,7 @@ export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
         }
       }
     }
-    
+
     return result
   }, [stats])
 
@@ -169,6 +209,8 @@ export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
     estimateSize: (i) => {
       const row = rows[i]
       if (row.kind === 'header') return 52
+      if (row.kind === 'bookmarked-header') return 36
+      if (row.kind === 'bookmarked-row') return 80
       if (row.kind === 'album-row') {
         // Height based on largest item in row + space for labels
         const maxCols = Math.max(...row.albums.map(a => a.cols))
@@ -193,6 +235,8 @@ export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
       for (let i = 0; i < rowIndex; i++) {
         const row = rows[i]
         if (row.kind === 'header') scrollPos += 52
+        else if (row.kind === 'bookmarked-header') scrollPos += 36
+        else if (row.kind === 'bookmarked-row') scrollPos += 80
         else if (row.kind === 'album-row') {
           const maxCols = Math.max(...row.albums.map(a => a.cols))
           scrollPos += (maxCols === 3 ? 180 : maxCols === 2 ? 120 : 80) + 24
@@ -248,6 +292,22 @@ export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
                     {row.singleCount > 0 && `, ${row.singleCount} single${row.singleCount !== 1 ? 's' : ''}`}
                   </span>
                 </div>
+              ) : row.kind === 'bookmarked-header' ? (
+                <div className="text-[12px] font-semibold text-[#d4a574] pt-3 pb-1.5 uppercase tracking-[0.5px] flex items-center gap-1.5">
+                  <span>🔖</span>
+                  <span>Bookmarked</span>
+                  <span className="text-[#555] font-normal normal-case tracking-normal text-[11px]">({row.count})</span>
+                </div>
+              ) : row.kind === 'bookmarked-row' ? (
+                <div className="grid grid-cols-6 gap-2 mb-2">
+                  {row.albums.map(album => (
+                    <AlbumTile
+                      key={`${album.artist}|||${album.album}`}
+                      album={album}
+                      onClick={() => onAlbumClick(album)}
+                    />
+                  ))}
+                </div>
               ) : row.kind === 'album-row' ? (
                 <div className="grid grid-cols-6 gap-2 mb-2">
                   {row.albums.map(album => (
@@ -298,10 +358,13 @@ function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => 
     <div
       onClick={onClick}
       title={`${album.album} — ${album.artist}`}
-      className={`${spanClass} cursor-pointer transition-opacity duration-200 ${album.tier ? 'opacity-100' : 'opacity-50'}`}
+      className={`${spanClass} cursor-pointer transition-opacity duration-200 ${(album.tier && album.tier !== 'hidden') ? 'opacity-100' : album.tier === 'hidden' ? 'opacity-30' : 'opacity-50'}`}
     >
       {/* Thumbnail */}
-      <div className="relative aspect-square rounded-md overflow-hidden bg-[#1a1a1a] border border-[#1e1e1e]">
+      <div
+        className="relative aspect-square rounded-md overflow-hidden bg-[#1a1a1a] border border-[#1e1e1e]"
+        style={album.tier === 'bookmarked' ? { boxShadow: 'inset 0 0 0 2px #d4a574' } : undefined}
+      >
         {album.imageUrl && !imgError ? (
           <img
             src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
@@ -325,7 +388,7 @@ function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => 
         </div>
 
         {/* Tier badge (top left) */}
-        {album.tier && (
+        {album.tier && album.tier !== 'bookmarked' && album.tier !== 'hidden' && (
           <div className={`absolute top-[3px] left-[3px] rounded-[3px] text-[8px] font-bold px-1 py-px text-black leading-[1.4] pointer-events-none uppercase ${
             album.tier === 'top' ? 'bg-[#22c55e]' : album.tier === 'mid' ? 'bg-[#f59e0b]' : 'bg-[#666]'
           }`}>
