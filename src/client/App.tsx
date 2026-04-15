@@ -193,6 +193,7 @@ export default function App() {
               if (!a.tier && !showUncategorized) return false
               return true
             })}
+            allStats={data.stats}
             onAlbumClick={setSelectedAlbum}
           />
         </>

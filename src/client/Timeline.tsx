@@ -4,6 +4,7 @@ import { AlbumStat } from './App'
 
 interface Props {
   stats: AlbumStat[]
+  allStats: AlbumStat[] // unfiltered stats for year nav
   onAlbumClick: (album: AlbumStat) => void
 }
 
@@ -98,15 +99,15 @@ function packSinglesIntoRows(singles: AlbumStat[], totalCols: number = 6): Album
   return rows
 }
 
-export default function Timeline({ stats, onAlbumClick }: Props) {
+export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
   const yearRefs = useRef<Map<number, number>>(new Map()) // year -> row index
   const [yearSearch, setYearSearch] = useState('')
 
-  // Compute year stats for nav bar (all albums, count categorized separately)
+  // Compute year stats for nav bar from ALL albums (unfiltered)
   const yearStats = useMemo(() => {
     const data = new Map<number, { total: number; categorized: number }>()
-    for (const s of stats) {
+    for (const s of allStats) {
       const year = s.releaseYear ?? 0
       if (!data.has(year)) data.set(year, { total: 0, categorized: 0 })
       const entry = data.get(year)!
@@ -116,7 +117,7 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
     return Array.from(data.entries())
       .filter(([_, d]) => d.total > 0) // only years with albums
       .sort((a, b) => b[0] - a[0]) // descending by year
-  }, [stats])
+  }, [allStats])
 
   // Build flat row list: header + packed album rows, then singles
   const rows = useMemo<Row[]>(() => {
