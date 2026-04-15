@@ -294,7 +294,7 @@ function NowPlaying({ albums, onAlbumClick }: NowPlayingProps) {
           {track.name}
         </div>
         <div className="text-xs text-[#888] truncate">
-          {track.artist}
+          {track.artist}{matchedAlbum?.releaseYear ? ` · ${matchedAlbum.releaseYear}` : ''}
         </div>
         {track.duration > 0 && (
           <div className="mt-1.5 h-0.5 bg-[#2a2a2a] rounded-[1px]">
