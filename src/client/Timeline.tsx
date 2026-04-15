@@ -14,7 +14,7 @@ type Row =
   | { kind: 'bookmarked-header'; count: number }
   | { kind: 'bookmarked-row'; albums: AlbumWithLayout[] }
   | { kind: 'album-row'; albums: AlbumWithLayout[] }
-  | { kind: 'singles-header'; count: number }
+  | { kind: 'singles-header'; year: number; count: number }
   | { kind: 'singles-row'; singles: AlbumWithLayout[] }
 
 interface AlbumWithLayout extends AlbumStat {
@@ -131,6 +131,16 @@ function packSinglesIntoRows(singles: AlbumStat[], totalCols: number = 6): Album
 export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
   const yearRefs = useRef<Map<number, number>>(new Map()) // year -> row index
+  const [expandedSingles, setExpandedSingles] = useState<Set<number>>(new Set())
+
+  const toggleSingles = (year: number) => {
+    setExpandedSingles(prev => {
+      const next = new Set(prev)
+      if (next.has(year)) next.delete(year)
+      else next.add(year)
+      return next
+    })
+  }
 
   // Compute year stats for nav bar from ALL albums (unfiltered)
   const yearStats = useMemo(() => {
@@ -193,16 +203,18 @@ export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
 
       // Singles section
       if (singles.length > 0) {
-        result.push({ kind: 'singles-header', count: singles.length })
-        const singleRows = packSinglesIntoRows(singles)
-        for (const row of singleRows) {
-          result.push({ kind: 'singles-row', singles: row })
+        result.push({ kind: 'singles-header', year, count: singles.length })
+        if (expandedSingles.has(year)) {
+          const singleRows = packSinglesIntoRows(singles)
+          for (const row of singleRows) {
+            result.push({ kind: 'singles-row', singles: row })
+          }
         }
       }
     }
 
     return result
-  }, [stats])
+  }, [stats, expandedSingles])
 
   const virtualiser = useWindowVirtualizer({
     count: rows.length,
@@ -319,8 +331,19 @@ export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
                   ))}
                 </div>
               ) : row.kind === 'singles-header' ? (
-                <div className="text-[13px] font-semibold text-[#444] pt-4 pb-2 uppercase tracking-[0.5px]">
+                <div
+                  className="text-[13px] font-semibold text-[#444] pt-4 pb-2 uppercase tracking-[0.5px] flex items-center gap-1.5 cursor-pointer select-none hover:text-[#666] transition-colors"
+                  onClick={() => toggleSingles(row.year)}
+                >
+                  <svg
+                    width="10" height="10" viewBox="0 0 10 10" fill="currentColor"
+                    className="transition-transform duration-200"
+                    style={{ transform: expandedSingles.has(row.year) ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                  >
+                    <path d="M3 1.5 L7 5 L3 8.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                   Singles
+                  <span className="text-[#333] font-normal normal-case tracking-normal text-[11px]">({row.count})</span>
                 </div>
               ) : row.kind === 'singles-row' ? (
                 <div className="grid grid-cols-6 gap-2 mb-2">
