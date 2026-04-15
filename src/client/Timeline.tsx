@@ -101,17 +101,20 @@ function packSinglesIntoRows(singles: AlbumStat[], totalCols: number = 6): Album
 export default function Timeline({ stats, onAlbumClick }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
   const yearRefs = useRef<Map<number, number>>(new Map()) // year -> row index
+  const [yearSearch, setYearSearch] = useState('')
 
-  // Compute year stats for nav bar (albums with tiers set)
+  // Compute year stats for nav bar (all albums, count categorized separately)
   const yearStats = useMemo(() => {
-    const counts = new Map<number, number>()
+    const data = new Map<number, { total: number; categorized: number }>()
     for (const s of stats) {
-      if (s.tier) { // only count albums with a tier set
-        const year = s.releaseYear ?? 0
-        counts.set(year, (counts.get(year) ?? 0) + 1)
-      }
+      const year = s.releaseYear ?? 0
+      if (!data.has(year)) data.set(year, { total: 0, categorized: 0 })
+      const entry = data.get(year)!
+      entry.total++
+      if (s.tier) entry.categorized++
     }
-    return Array.from(counts.entries())
+    return Array.from(data.entries())
+      .filter(([_, d]) => d.total > 0) // only years with albums
       .sort((a, b) => b[0] - a[0]) // descending by year
   }, [stats])
 
@@ -201,22 +204,43 @@ export default function Timeline({ stats, onAlbumClick }: Props) {
     }
   }
 
+  // Filter years based on search input
+  const filteredYears = useMemo(() => {
+    if (!yearSearch.trim()) return yearStats
+    const search = yearSearch.trim()
+    return yearStats.filter(([year]) => 
+      year.toString().includes(search)
+    )
+  }, [yearStats, yearSearch])
+
   return (
     <div ref={listRef}>
       {/* Year navigation bar */}
       {yearStats.length > 0 && (
         <div className="sticky top-0 z-10 bg-[#0f0f0f]/95 backdrop-blur-sm border-b border-[#1e1e1e] py-2 mb-4 -mx-4 px-4">
-          <div className="flex flex-wrap gap-1.5">
-            {yearStats.map(([year, count]) => (
-              <button
-                key={year}
-                onClick={() => scrollToYear(year)}
-                className="bg-[#1a1a1a] hover:bg-[#252525] border border-[#333] rounded px-2 py-1 text-xs text-[#888] hover:text-[#ccc] transition-colors"
-              >
-                <span className="text-[#aaa]">{year === 0 ? '?' : year}</span>
-                <span className="text-[#555] ml-1">({count})</span>
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Jump to year..."
+              value={yearSearch}
+              onChange={e => setYearSearch(e.target.value)}
+              className="bg-[#1a1a1a] border border-[#333] rounded px-2 py-1 text-sm text-[#ccc] w-32 outline-none focus:border-[#555]"
+            />
+            <div className="flex flex-wrap gap-1.5 flex-1">
+              {filteredYears.map(([year, { total, categorized }]) => (
+                <button
+                  key={year}
+                  onClick={() => {
+                    scrollToYear(year)
+                    setYearSearch('')
+                  }}
+                  className="bg-[#1a1a1a] hover:bg-[#252525] border border-[#333] rounded px-2 py-1 text-xs text-[#888] hover:text-[#ccc] transition-colors"
+                >
+                  <span className="text-[#aaa]">{year === 0 ? '?' : year}</span>
+                  <span className="text-[#555] ml-1">({categorized}/{total})</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
