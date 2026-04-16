@@ -271,7 +271,7 @@ export default function Timeline({ stats, allStats, onAlbumClick }: Props) {
               const year = parseInt(e.target.value, 10)
               if (!isNaN(year)) scrollToYear(year)
             }}
-            className="bg-[#1a1a1a] border border-[#333] rounded px-3 py-1.5 text-sm text-[#ccc] outline-none focus:border-[#555] cursor-pointer"
+            className="bg-[#1a1a1a] border border-[#333] px-3 py-1.5 text-sm text-[#ccc] outline-none focus:border-[#555] cursor-pointer"
           >
             <option value="" disabled>Jump to year...</option>
             {yearStats.map(([year, { categorized }]) => (
@@ -385,7 +385,7 @@ function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => 
     >
       {/* Thumbnail */}
       <div
-        className="relative aspect-square rounded-md overflow-hidden bg-[#1a1a1a] border border-[#1e1e1e]"
+        className="relative aspect-square overflow-hidden bg-[#1a1a1a] border border-[#1e1e1e]"
         style={album.tier === 'bookmarked' ? { boxShadow: 'inset 0 0 0 2px #d4a574' } : undefined}
       >
         {album.imageUrl && !imgError ? (
@@ -404,7 +404,7 @@ function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => 
 
         {/* Completion badge */}
         <div
-          className="absolute bottom-[3px] right-[3px] bg-black/80 rounded-[3px] text-[9px] font-bold px-[3px] py-px leading-[1.4] pointer-events-none"
+          className="absolute bottom-[3px] right-[3px] bg-black/80 text-[9px] font-bold px-[3px] py-px leading-[1.4] pointer-events-none"
           style={{ color: barColor }}
         >
           {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
@@ -412,7 +412,7 @@ function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => 
 
         {/* Tier badge (top left) */}
         {album.tier && album.tier !== 'bookmarked' && album.tier !== 'hidden' && (
-          <div className={`absolute top-[3px] left-[3px] rounded-[3px] text-[8px] font-bold px-1 py-px text-black leading-[1.4] pointer-events-none uppercase ${
+          <div className={`absolute top-[3px] left-[3px] text-[8px] font-bold px-1 py-px text-black leading-[1.4] pointer-events-none uppercase ${
             album.tier === 'top' ? 'bg-[#22c55e]' : album.tier === 'mid' ? 'bg-[#f59e0b]' : 'bg-[#666]'
           }`}>
             {album.tier}
@@ -424,14 +424,14 @@ function AlbumTile({ album, onClick }: { album: AlbumWithLayout; onClick: () => 
       {hasLabels && (
         <div className="mt-1 flex flex-wrap gap-[3px] text-[9px]">
           {album.energy && (
-            <span className="bg-[#3b82f6] text-white px-1 py-px rounded-[3px] font-semibold">
+            <span className="bg-[#3b82f6] text-white px-1 py-px font-semibold">
               {album.energy}
             </span>
           )}
           {album.tags?.map(tag => (
             <span
               key={tag}
-              className="bg-[#333] text-[#aaa] px-1 py-px rounded-[3px]"
+              className="bg-[#333] text-[#aaa] px-1 py-px"
             >
               {tag}
             </span>
@@ -457,7 +457,7 @@ function SingleTile({ album, onClick }: { album: AlbumWithLayout; onClick: () =>
     <div
       onClick={onClick}
       title={`${album.album} — ${album.artist}`}
-      className={`${spanClass} relative aspect-square rounded-[4px] overflow-hidden cursor-pointer bg-[#1a1a1a] border border-[#1e1e1e] transition-opacity duration-200 ${album.tier ? 'opacity-100' : 'opacity-50'}`}
+      className={`${spanClass} relative aspect-square overflow-hidden cursor-pointer bg-[#1a1a1a] border border-[#1e1e1e] transition-opacity duration-200 ${album.tier ? 'opacity-100' : 'opacity-50'}`}
     >
       {album.imageUrl && !imgError ? (
         <img
@@ -475,7 +475,7 @@ function SingleTile({ album, onClick }: { album: AlbumWithLayout; onClick: () =>
 
       {/* Completion badge */}
       <div
-        className="absolute bottom-0.5 right-0.5 bg-black/80 rounded-[2px] text-[8px] font-bold px-[2px] py-px leading-[1.3] pointer-events-none"
+        className="absolute bottom-0.5 right-0.5 bg-black/80 text-[8px] font-bold px-[2px] py-px leading-[1.3] pointer-events-none"
         style={{ color: barColor }}
       >
         {album.totalTracks > 0 ? `${album.percentage}%` : '?'}

@@ -100,7 +100,7 @@ export default function App() {
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="bg-[#1a1a1a] border border-[#333] text-[#666] px-[10px] py-[6px] rounded-md cursor-pointer text-[13px]"
+              className="bg-[#1a1a1a] border border-[#333] text-[#666] px-[10px] py-[6px] cursor-pointer text-[13px]"
             >
               {refreshing ? '…' : '↻'}
             </button>
@@ -110,7 +110,7 @@ export default function App() {
 
       {/* Stats bar */}
       {data && !data.loading && (
-        <div className="flex gap-6 mb-6 bg-[#1a1a1a] rounded-[10px] px-[18px] py-3 flex-wrap items-center">
+        <div className="flex gap-6 mb-6 bg-[#1a1a1a] px-[18px] py-3 flex-wrap items-center">
           <Stat label="Total scrobbles" value={data.totalTracks.toLocaleString()} />
           <Stat label="Albums tracked" value={data.stats.length.toString()} />
           <Stat label="Need finishing" value={incompleteCount.toString()} color="#f59e0b" />
@@ -125,7 +125,7 @@ export default function App() {
 
       {/* Error state */}
       {data?.status === 'error' && (
-        <div className="bg-[#1a1a1a] border border-[#3a1a1a] rounded-[10px] p-6 text-center mb-6 text-[#f87171]">
+        <div className="bg-[#1a1a1a] border border-[#3a1a1a] p-6 text-center mb-6 text-[#f87171]">
           <div className="text-2xl mb-2">⚠️</div>
           <p className="font-semibold">Something went wrong</p>
           <p className="text-[13px] mt-1 text-[#888]">
@@ -136,7 +136,7 @@ export default function App() {
 
       {/* Loading state */}
       {data?.loading && (
-        <div className="bg-[#1a1a1a] rounded-[10px] p-6 text-center mb-6 text-[#888]">
+        <div className="bg-[#1a1a1a] p-6 text-center mb-6 text-[#888]">
           <div className="text-2xl mb-2">⏳</div>
           <p>Building your listening history…</p>
           <p className="text-[13px] mt-1 text-[#555]">
@@ -168,7 +168,7 @@ export default function App() {
             placeholder="Search albums or artists…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full bg-[#1a1a1a] border border-[#333] text-[#e0e0e0] rounded-lg px-[14px] py-2 text-sm outline-none"
+            className="w-full bg-[#1a1a1a] border border-[#333] text-[#e0e0e0] px-[14px] py-2 text-sm outline-none"
           />
         </div>
       )}
@@ -291,13 +291,13 @@ function NowPlaying({ albums, onAlbumClick }: NowPlayingProps) {
     : null
 
   return (
-    <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-3 mb-5 flex flex-row items-center gap-3">
+    <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-3 mb-5 flex flex-row items-center gap-3">
       {track.albumArt && (
         <img
           src={track.albumArt}
           alt=""
           onClick={matchedAlbum ? () => onAlbumClick(matchedAlbum) : undefined}
-          className={`w-[110px] h-[110px] rounded-md shrink-0 object-cover block ${matchedAlbum ? 'cursor-pointer' : 'cursor-default'}`}
+          className={`w-[110px] h-[110px] shrink-0 object-cover block ${matchedAlbum ? 'cursor-pointer' : 'cursor-default'}`}
         />
       )}
       <div className="flex-1 min-w-0">
@@ -311,8 +311,8 @@ function NowPlaying({ albums, onAlbumClick }: NowPlayingProps) {
           {track.artist}{matchedAlbum?.releaseYear ? ` · ${matchedAlbum.releaseYear}` : ''}
         </div>
         {track.duration > 0 && (
-          <div className="mt-1.5 h-0.5 bg-[#2a2a2a] rounded-[1px]">
-            <div className="h-full bg-[#1db954] rounded-[1px]" style={{ width: `${pct}%` }} />
+          <div className="mt-1.5 h-0.5 bg-[#2a2a2a]">
+            <div className="h-full bg-[#1db954]" style={{ width: `${pct}%` }} />
           </div>
         )}
       </div>

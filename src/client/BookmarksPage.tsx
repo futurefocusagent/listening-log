@@ -60,7 +60,7 @@ export default function BookmarksPage() {
       )}
 
       {error && (
-        <div className="bg-[#1a1a1a] border border-[#3a1a1a] rounded-[10px] p-6 text-center text-[#f87171]">
+        <div className="bg-[#1a1a1a] border border-[#3a1a1a] p-6 text-center text-[#f87171]">
           <p className="font-semibold">Something went wrong</p>
           <p className="text-[13px] mt-1 text-[#888]">{error}</p>
         </div>
@@ -116,13 +116,7 @@ function AlbumRow({ album, isFirst, isLast, onClick }: AlbumRowProps) {
     ? `/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`
     : null
 
-  const roundedClass = isFirst && isLast
-    ? 'rounded-[10px]'
-    : isFirst
-    ? 'rounded-t-[10px]'
-    : isLast
-    ? 'rounded-b-[10px]'
-    : ''
+  const roundedClass = ''
 
   return (
     <button
@@ -130,7 +124,7 @@ function AlbumRow({ album, isFirst, isLast, onClick }: AlbumRowProps) {
       className={`w-full flex items-center gap-4 bg-[#1a1a1a] hover:bg-[#222] transition-colors px-4 py-[10px] text-left ${roundedClass}`}
     >
       {/* Album art */}
-      <div className="w-[84px] h-[84px] shrink-0 rounded-md overflow-hidden bg-[#2a2a2a]">
+      <div className="w-[84px] h-[84px] shrink-0 overflow-hidden bg-[#2a2a2a]">
         {artUrl ? (
           <img src={artUrl} alt="" className="w-full h-full object-cover" />
         ) : (

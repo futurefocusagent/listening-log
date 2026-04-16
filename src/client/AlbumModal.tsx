@@ -168,17 +168,17 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="bg-[#111] rounded-xl max-w-[480px] w-full max-h-[90vh] overflow-auto relative border border-[#2a2a2a]"
+        className="bg-[#111] max-w-[480px] w-full max-h-[90vh] overflow-auto relative border border-[#2a2a2a]"
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-[2] bg-black/60 border-none text-[#aaa] text-lg cursor-pointer leading-none w-7 h-7 rounded-full flex items-center justify-center"
+          className="absolute top-3 right-3 z-[2] bg-black/60 border-none text-[#aaa] text-lg cursor-pointer leading-none w-7 h-7 flex items-center justify-center"
         >✕</button>
 
         {/* Full-width album cover */}
         {album.imageUrl && (
-          <div className="w-full aspect-square overflow-hidden rounded-t-xl">
+          <div className="w-full aspect-square overflow-hidden">
             <img
               src={`/api/albumart?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`}
               alt={album.album}
@@ -201,11 +201,11 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
           {/* Stats row */}
           <div className="flex gap-3 items-center mb-5">
             <div
-              className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center"
+              className="w-10 h-10 shrink-0 flex items-center justify-center"
               style={{ background: `conic-gradient(${barColor} ${album.percentage}%, #2a2a2a ${album.percentage}%)` }}
             >
               <div
-                className="w-[30px] h-[30px] rounded-full bg-[#111] flex items-center justify-center text-[9px] font-bold"
+                className="w-[30px] h-[30px] bg-[#111] flex items-center justify-center text-[9px] font-bold"
                 style={{ color: barColor }}
               >
                 {album.totalTracks > 0 ? `${album.percentage}%` : '?'}
@@ -219,22 +219,22 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                 onClick={handlePlay}
                 disabled={playing}
                 title="Play in Spotify"
-                className="w-8 h-8 flex items-center justify-center bg-[#1db954] rounded cursor-pointer border-none disabled:opacity-50"
+                className="w-8 h-8 flex items-center justify-center border border-[#1db954]/50 bg-[#1db954]/10 cursor-pointer disabled:opacity-50"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="white">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="#1db954">
                   <polygon points="2,1 13,7 2,13" />
                 </svg>
               </button>
             </div>
           </div>
           {playMsg && (
-            <div className={`text-xs mb-3 px-3 py-1.5 rounded-md ${playMsg.ok ? 'bg-[#14532d] text-[#86efac]' : 'bg-[#450a0a] text-[#fca5a5]'}`}>
+            <div className={`text-xs mb-3 px-3 py-1.5 ${playMsg.ok ? 'bg-[#14532d] text-[#86efac]' : 'bg-[#450a0a] text-[#fca5a5]'}`}>
               {playMsg.text}
             </div>
           )}
 
           {/* Categorization section */}
-          <div className="mb-5 p-4 bg-[#1a1a1a] rounded-lg">
+          <div className="mb-5 p-4 bg-[#1a1a1a]">
             {/* Tier */}
             <div className="mb-4">
               <div className="text-[11px] text-[#555] uppercase tracking-[0.08em] mb-2">
@@ -246,7 +246,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                     key={t}
                     onClick={() => handleTierChange(tier === t ? undefined : t)}
                     disabled={saving}
-                    className={`px-3.5 py-1.5 rounded-md border-none cursor-pointer text-xs font-bold uppercase ${saving ? 'opacity-50' : ''} ${
+                    className={`px-3.5 py-1.5 border-none cursor-pointer text-xs font-bold uppercase ${saving ? 'opacity-50' : ''} ${
                       tier === t
                         ? t === 'top' ? 'bg-[#22c55e] text-black'
                           : t === 'mid' ? 'bg-[#f59e0b] text-black'
@@ -273,7 +273,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                     key={e}
                     onClick={() => handleEnergyChange(energy === e ? undefined : e)}
                     disabled={saving}
-                    className={`px-3.5 py-1.5 rounded-md border-none cursor-pointer text-xs font-bold ${saving ? 'opacity-50' : ''} ${energy === e ? 'bg-[#3b82f6] text-white' : 'bg-[#2a2a2a] text-[#888]'}`}
+                    className={`px-3.5 py-1.5 border-none cursor-pointer text-xs font-bold ${saving ? 'opacity-50' : ''} ${energy === e ? 'bg-[#3b82f6] text-white' : 'bg-[#2a2a2a] text-[#888]'}`}
                   >
                     {e}
                   </button>
@@ -292,7 +292,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                 {tags.map(tag => (
                   <span
                     key={tag}
-                    className="px-2 py-1 rounded text-[11px] bg-[#333] text-[#ccc] flex items-center gap-1.5"
+                    className="px-2 py-1 text-[11px] bg-[#333] text-[#ccc] flex items-center gap-1.5"
                   >
                     {tag}
                     <button
@@ -339,11 +339,11 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                       }
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-md border border-[#333] bg-[#222] text-[#e0e0e0] text-[13px] outline-none"
+                  className="w-full px-3 py-2 border border-[#333] bg-[#222] text-[#e0e0e0] text-[13px] outline-none"
                 />
                 {/* Autocomplete suggestions */}
                 {newTagInput && suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 bg-[#222] border border-[#333] rounded-md mt-1 overflow-hidden z-10">
+                  <div className="absolute top-full left-0 right-0 bg-[#222] border border-[#333] mt-1 overflow-hidden z-10">
                     {suggestions.map((tag, i) => (
                       <div
                         key={tag.id}
@@ -369,7 +369,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                       <button
                         key={tag}
                         onClick={() => addTag(tag)}
-                        className="px-2 py-0.5 rounded text-[11px] bg-[#1a1a1a] border border-[#2a2a2a] text-[#555] hover:text-[#aaa] hover:border-[#444] cursor-pointer transition-colors flex items-center gap-1"
+                        className="px-2 py-0.5 text-[11px] bg-[#1a1a1a] border border-[#2a2a2a] text-[#555] hover:text-[#aaa] hover:border-[#444] cursor-pointer transition-colors flex items-center gap-1"
                       >
                         <span className="text-[#3a3a3a]">+</span>
                         <span>{tag}</span>
