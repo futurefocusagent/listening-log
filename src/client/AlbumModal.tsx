@@ -13,6 +13,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
   const [tags, setTags] = useState<string[]>(album.tags ?? [])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [newTagInput, setNewTagInput] = useState('')
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const [suggestedTags, setSuggestedTags] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -96,6 +97,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
         const newTags = [...tags, normalized]
         setTags(newTags)
         setNewTagInput('')
+        setHighlightedIndex(-1)
         onUpdate?.({ tags: newTags })
         // Refresh all tags list
         const tagsRes = await fetch('/api/tags')
@@ -310,10 +312,31 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                   type="text"
                   placeholder="Add tag..."
                   value={newTagInput}
-                  onChange={e => setNewTagInput(e.target.value)}
+                  onChange={e => {
+                    setNewTagInput(e.target.value)
+                    setHighlightedIndex(-1)
+                  }}
                   onKeyDown={e => {
-                    if (e.key === 'Enter' && newTagInput.trim()) {
-                      addTag(newTagInput)
+                    const open = newTagInput.length > 0 && suggestions.length > 0
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault()
+                      if (open) setHighlightedIndex(i => Math.min(i + 1, suggestions.length - 1))
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault()
+                      if (open) setHighlightedIndex(i => Math.max(i - 1, -1))
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault()
+                      if (open && highlightedIndex >= 0) {
+                        addTag(suggestions[highlightedIndex].name)
+                      } else if (newTagInput.trim()) {
+                        addTag(newTagInput)
+                      }
+                    } else if (e.key === 'Escape') {
+                      if (open) {
+                        e.stopPropagation()
+                        setNewTagInput('')
+                        setHighlightedIndex(-1)
+                      }
                     }
                   }}
                   className="w-full px-3 py-2 rounded-md border border-[#333] bg-[#222] text-[#e0e0e0] text-[13px] outline-none"
@@ -321,13 +344,15 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                 {/* Autocomplete suggestions */}
                 {newTagInput && suggestions.length > 0 && (
                   <div className="absolute top-full left-0 right-0 bg-[#222] border border-[#333] rounded-md mt-1 overflow-hidden z-10">
-                    {suggestions.map(tag => (
+                    {suggestions.map((tag, i) => (
                       <div
                         key={tag.id}
                         onClick={() => addTag(tag.name)}
-                        className="px-3 py-2 cursor-pointer text-[13px] flex justify-between items-center hover:bg-[#2a2a2a]"
+                        onMouseEnter={() => setHighlightedIndex(i)}
+                        onMouseLeave={() => setHighlightedIndex(-1)}
+                        className={`px-3 py-2 cursor-pointer text-[13px] flex justify-between items-center ${i === highlightedIndex ? 'bg-[#2a2a2a]' : 'hover:bg-[#2a2a2a]'}`}
                       >
-                        <span className="text-[#ccc]">{tag.name}</span>
+                        <span className={i === highlightedIndex ? 'text-white' : 'text-[#ccc]'}>{tag.name}</span>
                         <span className="text-[#555] text-[11px]">{tag.count} albums</span>
                       </div>
                     ))}
