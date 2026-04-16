@@ -215,8 +215,11 @@ export default function App() {
 
       {/* Album detail modal */}
       {selectedAlbum && (
-        <AlbumModal 
-          album={selectedAlbum} 
+        <AlbumModal
+          key={`${selectedAlbum.artist}|||${selectedAlbum.album}`}
+          album={selectedAlbum}
+          allStats={data?.stats}
+          onNavigate={setSelectedAlbum}
           onClose={() => setSelectedAlbum(null)}
           onUpdate={(updated) => {
             // Update both the selected album and the data array

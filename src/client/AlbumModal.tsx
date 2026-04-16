@@ -14,9 +14,11 @@ interface Props {
   album: AlbumStat
   onClose: () => void
   onUpdate?: (updated: Partial<AlbumStat>) => void
+  allStats?: AlbumStat[]
+  onNavigate?: (album: AlbumStat) => void
 }
 
-export default function AlbumModal({ album, onClose, onUpdate }: Props) {
+export default function AlbumModal({ album, onClose, onUpdate, allStats, onNavigate }: Props) {
   const [tier, setTier] = useState<'top' | 'mid' | 'low' | 'hidden' | 'bookmarked' | undefined>(album.tier)
   const [energy, setEnergy] = useState<'ambient' | 'moderate' | 'intense' | undefined>(album.energy)
   const [tags, setTags] = useState<string[]>(album.tags ?? [])
@@ -502,6 +504,87 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
                 {!artistInfo.area && !artistInfo.formedYear && artistInfo.tags.length === 0 && !artistInfo.disambiguation && (
                   <div className="text-[#444] text-xs mt-2">No additional info available.</div>
                 )}
+
+                {/* Discography */}
+                {(() => {
+                  const others = (allStats ?? []).filter(
+                    s => s.artist.toLowerCase() === album.artist.toLowerCase() &&
+                         s.album !== album.album
+                  )
+                  const discogAlbums = others
+                    .filter(s => s.totalTracks >= 4 || s.totalTracks === 0)
+                    .sort((a, b) => (b.releaseYear ?? 0) - (a.releaseYear ?? 0))
+                  const singles = others
+                    .filter(s => s.totalTracks >= 1 && s.totalTracks <= 3)
+                    .sort((a, b) => (b.releaseYear ?? 0) - (a.releaseYear ?? 0))
+
+                  const tierDotColor = (t: AlbumStat['tier']) => {
+                    if (t === 'top') return '#22c55e'
+                    if (t === 'mid') return '#f59e0b'
+                    if (t === 'low') return '#666'
+                    if (t === 'bookmarked') return '#d4a574'
+                    return null
+                  }
+
+                  const DiscogItem = ({ s }: { s: AlbumStat }) => {
+                    const artUrl = `/api/albumart?artist=${encodeURIComponent(s.artist)}&album=${encodeURIComponent(s.album)}`
+                    const dotColor = tierDotColor(s.tier)
+                    return (
+                      <button
+                        onClick={() => onNavigate?.(s)}
+                        className="w-full flex items-center gap-2.5 py-1.5 px-0 bg-transparent border-none cursor-pointer hover:bg-[#1a1a1a] text-left group"
+                      >
+                        <div className="w-[46px] h-[46px] shrink-0 bg-[#1a1a1a] overflow-hidden">
+                          <img
+                            src={artUrl}
+                            alt=""
+                            className="w-full h-full object-cover block"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[12px] text-[#ccc] group-hover:text-white truncate leading-tight">{s.album}</div>
+                          {s.releaseYear && (
+                            <div className="text-[10px] text-[#555] mt-0.5">{s.releaseYear}</div>
+                          )}
+                        </div>
+                        {dotColor && (
+                          <div
+                            className="w-2 h-2 shrink-0"
+                            style={{ background: dotColor }}
+                          />
+                        )}
+                      </button>
+                    )
+                  }
+
+                  if (others.length === 0) {
+                    return (
+                      <div className="mt-5 pt-4 border-t border-[#1a1a1a]">
+                        <div className="text-[10px] text-[#444] uppercase tracking-[0.08em] mb-2">Discography</div>
+                        <div className="text-[11px] text-[#3a3a3a] italic">No other releases in library</div>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div className="mt-5 pt-4 border-t border-[#1a1a1a]">
+                      <div className="text-[10px] text-[#444] uppercase tracking-[0.08em] mb-2">Discography</div>
+                      {discogAlbums.length > 0 && (
+                        <div className="mb-3">
+                          <div className="text-[9px] text-[#333] uppercase tracking-[0.08em] mb-1">Albums</div>
+                          {discogAlbums.map(s => <DiscogItem key={`${s.artist}|||${s.album}`} s={s} />)}
+                        </div>
+                      )}
+                      {singles.length > 0 && (
+                        <div>
+                          <div className="text-[9px] text-[#333] uppercase tracking-[0.08em] mb-1">Singles</div>
+                          {singles.map(s => <DiscogItem key={`${s.artist}|||${s.album}`} s={s} />)}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
             </>
           ) : (

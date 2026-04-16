@@ -19,9 +19,17 @@ function formatBookmarkedDate(iso: string | undefined): string {
 
 export default function BookmarksPage() {
   const [albums, setAlbums] = useState<AlbumStat[]>([])
+  const [allStats, setAllStats] = useState<AlbumStat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedAlbum, setSelectedAlbum] = useAlbumModal(albums)
+
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(data => setAllStats(data.stats ?? []))
+      .catch(console.error)
+  }, [])
 
   useEffect(() => {
     fetch('/api/bookmarks')
@@ -86,7 +94,10 @@ export default function BookmarksPage() {
 
       {selectedAlbum && (
         <AlbumModal
+          key={`${selectedAlbum.artist}|||${selectedAlbum.album}`}
           album={selectedAlbum}
+          allStats={allStats}
+          onNavigate={setSelectedAlbum}
           onClose={() => setSelectedAlbum(null)}
           onUpdate={(updated) => {
             setSelectedAlbum(prev => prev ? { ...prev, ...updated } : null)

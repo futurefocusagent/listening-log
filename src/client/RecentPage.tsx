@@ -22,9 +22,17 @@ function formatListenDate(iso: string): string {
 
 export default function RecentPage() {
   const [albums, setAlbums] = useState<RecentAlbum[]>([])
+  const [allStats, setAllStats] = useState<AlbumStat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedAlbum, setSelectedAlbum] = useAlbumModal(albums)
+
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(data => setAllStats(data.stats ?? []))
+      .catch(console.error)
+  }, [])
 
   useEffect(() => {
     fetch('/api/recent')
@@ -89,7 +97,10 @@ export default function RecentPage() {
 
       {selectedAlbum && (
         <AlbumModal
+          key={`${selectedAlbum.artist}|||${selectedAlbum.album}`}
           album={selectedAlbum}
+          allStats={allStats}
+          onNavigate={setSelectedAlbum}
           onClose={() => setSelectedAlbum(null)}
           onUpdate={(updated) => {
             setSelectedAlbum(prev => prev ? { ...prev, ...updated } : null)
