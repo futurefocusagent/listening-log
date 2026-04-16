@@ -198,7 +198,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
         >✕</button>
 
         {/* Left column: album content */}
-        <div className="w-[280px] shrink-0 overflow-y-auto border-r border-[#2a2a2a]">
+        <div className="w-1/2 overflow-y-auto border-r border-[#2a2a2a]">
           {/* Album cover */}
           {album.imageUrl && (
             <div className="w-full aspect-square overflow-hidden">
@@ -428,7 +428,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
         </div>
 
         {/* Right column: artist info */}
-        <div className="flex-1 overflow-y-auto flex flex-col">
+        <div className="w-1/2 overflow-y-auto flex flex-col">
           {artistLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-[#444] text-xs">Loading artist info...</div>
@@ -436,13 +436,20 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
           ) : artistInfo ? (
             <>
               {/* Artist image */}
-              {artistInfo.imageUrl && (
+              {artistInfo.imageUrl ? (
                 <div className="w-full aspect-square overflow-hidden shrink-0">
                   <img
                     src={artistInfo.imageUrl}
                     alt={artistInfo.name}
                     className="w-full h-full object-cover block"
                   />
+                </div>
+              ) : (
+                <div className="w-full aspect-square shrink-0 bg-[#1a1a1a] flex items-center justify-center">
+                  <svg width="72" height="72" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="8" r="4" fill="#333" />
+                    <path d="M4 20c0-4 3.582-7 8-7s8 3 8 7" stroke="#333" strokeWidth="2" strokeLinecap="square" fill="none" />
+                  </svg>
                 </div>
               )}
 
