@@ -50,6 +50,56 @@ export async function getMbAlbumTags(artist: string, album: string): Promise<str
   }
 }
 
+export interface MbArtistInfo {
+  name: string
+  disambiguation?: string
+  area?: string
+  formedYear?: number
+  tags: string[]
+}
+
+export async function getMbArtistInfo(artist: string): Promise<MbArtistInfo | null> {
+  try {
+    const searchData = await mbGet('/artist/', {
+      query: `artist:"${artist}"`,
+      limit: '3',
+    }) as { artists?: Array<{ id: string; name: string; score?: number }> }
+
+    const artists = searchData.artists ?? []
+    if (artists.length === 0) return null
+
+    const mbid = artists[0].id
+
+    const data = await mbGet(`/artist/${mbid}`, {
+      inc: 'tags',
+    }) as {
+      name: string
+      disambiguation?: string
+      area?: { name: string }
+      'life-span'?: { begin?: string }
+      tags?: Array<{ name: string; count: number }>
+    }
+
+    const tags = (data.tags ?? [])
+      .sort((a, b) => b.count - a.count)
+      .map(t => t.name.toLowerCase())
+      .slice(0, 10)
+
+    const beginStr = data['life-span']?.begin
+    const formedYear = beginStr ? parseInt(beginStr.slice(0, 4), 10) : undefined
+
+    return {
+      name: data.name,
+      disambiguation: data.disambiguation,
+      area: data.area?.name,
+      formedYear: formedYear && !isNaN(formedYear) ? formedYear : undefined,
+      tags,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function getReleaseYear(artist: string, album: string): Promise<number | null> {
   try {
     const data = await mbGet('/release/', {

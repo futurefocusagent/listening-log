@@ -182,6 +182,39 @@ async function getAlbumTracks(albumId: string, token: string): Promise<string[]>
   return tracks
 }
 
+// Fetch artist image URL from Spotify
+export async function getSpotifyArtistImage(artist: string): Promise<string | null> {
+  try {
+    const token = await getAccessToken()
+    const query = encodeURIComponent(artist)
+    const res = await fetch(`https://api.spotify.com/v1/search?q=${query}&type=artist&limit=5`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+    if (!res.ok) return null
+
+    const data = await res.json() as {
+      artists?: { items?: Array<{ name: string; images: Array<{ url: string; height: number }> }> }
+    }
+    const results = data.artists?.items ?? []
+    if (results.length === 0) return null
+
+    // Prefer exact name match
+    const artistLower = artist.toLowerCase()
+    let best = results[0]
+    for (const a of results) {
+      if (a.name.toLowerCase() === artistLower) {
+        best = a
+        break
+      }
+    }
+
+    if (best.images.length === 0) return null
+    return best.images.sort((a, b) => b.height - a.height)[0].url
+  } catch {
+    return null
+  }
+}
+
 // Simple search that returns just the ID (for backwards compat)
 export async function searchAlbumId(artist: string, album: string): Promise<string | null> {
   const result = await searchAlbum(artist, album)

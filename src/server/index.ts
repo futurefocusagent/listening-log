@@ -3,8 +3,8 @@ import express from 'express'
 import path from 'path'
 import { getAllTracks, AlbumStat, getAlbumTopTags, getArtistTopTags } from './lastfm.js'
 import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata, getAllTags, createTag, renameTag, deleteTag, addTagToAlbum, removeTagFromAlbum, getOrCreateTag, updateAlbumCategorization, getSetting, setSetting, getBookmarks } from './db.js'
-import { searchAlbum as spotifySearchAlbum, SpotifyAlbumInfo } from './spotify.js'
-import { getMbAlbumTags } from './musicbrainz.js'
+import { searchAlbum as spotifySearchAlbum, SpotifyAlbumInfo, getSpotifyArtistImage } from './spotify.js'
+import { getMbAlbumTags, getMbArtistInfo } from './musicbrainz.js'
 import { initLoggerDb, startSyncLog, updateSyncLog, logError, finishSyncLog, getRecentSyncLogs, getUnacknowledgedAlerts, acknowledgeAlert, acknowledgeAllAlerts } from './logger.js'
 
 const app = express()
@@ -444,6 +444,46 @@ app.get('/api/albums/:artist/:album/suggested-tags', async (req, res) => {
   suggestedTagsCache.set(cacheKey, { tags: top8, ts: Date.now() })
 
   res.json({ tags: top8 })
+})
+
+// ==================== ARTIST INFO ====================
+
+interface ArtistInfo {
+  name: string
+  imageUrl: string | null
+  area?: string
+  formedYear?: number
+  tags: string[]
+  disambiguation?: string
+}
+
+const artistInfoCache = new Map<string, { data: ArtistInfo; ts: number }>()
+const ARTIST_INFO_TTL = 60 * 60 * 1000 // 1 hour
+
+app.get('/api/artists/:name/info', async (req, res) => {
+  const name = decodeURIComponent(req.params.name)
+  const cacheKey = name.toLowerCase()
+  const cached = artistInfoCache.get(cacheKey)
+  if (cached && Date.now() - cached.ts < ARTIST_INFO_TTL) {
+    return res.json(cached.data)
+  }
+
+  const [mbInfo, imageUrl] = await Promise.all([
+    getMbArtistInfo(name).catch(() => null),
+    getSpotifyArtistImage(name).catch(() => null),
+  ])
+
+  const result: ArtistInfo = {
+    name: mbInfo?.name ?? name,
+    imageUrl: imageUrl ?? null,
+    area: mbInfo?.area,
+    formedYear: mbInfo?.formedYear,
+    tags: mbInfo?.tags ?? [],
+    disambiguation: mbInfo?.disambiguation,
+  }
+
+  artistInfoCache.set(cacheKey, { data: result, ts: Date.now() })
+  res.json(result)
 })
 
 // ==================== SPOTIFY NOW PLAYING ====================
