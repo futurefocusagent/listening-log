@@ -130,10 +130,10 @@ function AlbumRow({ album, isFirst, isLast, onClick }: AlbumRowProps) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-4 bg-[#1a1a1a] hover:bg-[#222] transition-colors px-4 py-3 text-left ${roundedClass}`}
+      className={`w-full flex items-center gap-4 bg-[#1a1a1a] hover:bg-[#222] transition-colors px-4 py-[10px] text-left ${roundedClass}`}
     >
       {/* Album art */}
-      <div className="w-[60px] h-[60px] shrink-0 rounded-md overflow-hidden bg-[#2a2a2a]">
+      <div className="w-[84px] h-[84px] shrink-0 rounded-md overflow-hidden bg-[#2a2a2a]">
         {artUrl ? (
           <img src={artUrl} alt="" className="w-full h-full object-cover" />
         ) : (
