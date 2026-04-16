@@ -93,8 +93,10 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
       })
       const data = await res.json()
       if (data.ok) {
-        setTags([...tags, normalized])
+        const newTags = [...tags, normalized]
+        setTags(newTags)
         setNewTagInput('')
+        onUpdate?.({ tags: newTags })
         // Refresh all tags list
         const tagsRes = await fetch('/api/tags')
         setAllTags(await tagsRes.json())
@@ -112,7 +114,9 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
       await fetch(`/api/albums/${encodeURIComponent(album.artist)}/${encodeURIComponent(album.album)}/tags/${tag.id}`, {
         method: 'DELETE',
       })
-      setTags(tags.filter(t => t !== tagName))
+      const newTags = tags.filter(t => t !== tagName)
+      setTags(newTags)
+      onUpdate?.({ tags: newTags })
     } catch (err) {
       console.error('Failed to remove tag:', err)
     }
