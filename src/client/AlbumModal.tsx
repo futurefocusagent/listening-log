@@ -189,7 +189,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="bg-[#111] w-full max-w-3xl max-h-[90vh] flex border border-[#2a2a2a] relative overflow-hidden"
+        className="bg-[#111] w-full max-w-3xl max-h-[90vh] flex border border-[#2a2a2a] relative overflow-y-auto"
       >
         {/* Close button */}
         <button
@@ -198,7 +198,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
         >✕</button>
 
         {/* Left column: album content */}
-        <div className="w-1/2 overflow-y-auto border-r border-[#2a2a2a]">
+        <div className="w-1/2 border-r border-[#2a2a2a]">
           {/* Album cover */}
           {album.imageUrl && (
             <div className="w-full aspect-square overflow-hidden">
@@ -428,7 +428,7 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
         </div>
 
         {/* Right column: artist info */}
-        <div className="w-1/2 overflow-y-auto flex flex-col">
+        <div className="w-1/2 flex flex-col">
           {artistLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-[#444] text-xs">Loading artist info...</div>
