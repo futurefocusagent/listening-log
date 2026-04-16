@@ -129,28 +129,36 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
     .filter(t => !tags.includes(t.name) && t.name.includes(newTagInput.toLowerCase()))
     .slice(0, 5)
 
+  const spotifyHref = album.spotifyId
+    ? `spotify:album:${album.spotifyId}`
+    : `spotify:search:${encodeURIComponent(`${album.artist} ${album.album}`)}`
+
   const handlePlay = async () => {
-    if (!album.spotifyId || playing) return
+    if (playing) return
     setPlaying(true)
     setPlayMsg(null)
-    try {
-      const res = await fetch('/api/spotify/play', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spotifyId: album.spotifyId }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        setPlayMsg({ text: 'Playing!', ok: true })
-      } else {
-        setPlayMsg({ text: data.error || 'Playback failed', ok: false })
+    let playSucceeded = false
+    if (album.spotifyId) {
+      try {
+        const res = await fetch('/api/spotify/play', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ spotifyId: album.spotifyId }),
+        })
+        const data = await res.json()
+        if (data.ok) {
+          playSucceeded = true
+          setPlayMsg({ text: 'Playing!', ok: true })
+          setTimeout(() => setPlayMsg(null), 3000)
+        }
+      } catch {
+        // fall through to open in Spotify
       }
-    } catch {
-      setPlayMsg({ text: 'Network error', ok: false })
-    } finally {
-      setPlaying(false)
-      setTimeout(() => setPlayMsg(null), 3000)
     }
+    if (!playSucceeded) {
+      window.location.href = spotifyHref
+    }
+    setPlaying(false)
   }
 
   return (
@@ -207,24 +215,16 @@ export default function AlbumModal({ album, onClose, onUpdate }: Props) {
               {album.listenedCount}{album.totalTracks > 0 ? `/${album.totalTracks}` : ''} tracks listened
             </span>
             <div className="ml-auto flex items-center gap-2">
-              {album.spotifyId && (
-                <button
-                  onClick={handlePlay}
-                  disabled={playing}
-                  title="Play album in Spotify"
-                  className="text-lg bg-transparent border-none cursor-pointer p-0 leading-none disabled:opacity-50"
-                >
-                  {playing ? '⏳' : '▶️'}
-                </button>
-              )}
-              <a
-                href={album.spotifyId
-                  ? `spotify:album:${album.spotifyId}`
-                  : `spotify:search:${encodeURIComponent(`${album.artist} ${album.album}`)}`
-                }
-                title="Open in Spotify"
-                className="text-lg no-underline"
-              >🎧</a>
+              <button
+                onClick={handlePlay}
+                disabled={playing}
+                title="Play in Spotify"
+                className="w-8 h-8 flex items-center justify-center bg-[#1db954] rounded cursor-pointer border-none disabled:opacity-50"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="white">
+                  <polygon points="2,1 13,7 2,13" />
+                </svg>
+              </button>
             </div>
           </div>
           {playMsg && (
