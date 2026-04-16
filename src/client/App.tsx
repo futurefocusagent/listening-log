@@ -81,7 +81,13 @@ export default function App() {
           <h1 className="text-[26px] font-bold mb-1">🎵 Listening Log</h1>
           <p className="text-[#666] text-[13px]">boytunewonder · album completion tracker</p>
         </div>
-        <div className="flex gap-1 items-center">
+        <div className="flex gap-2 items-center">
+          <a
+            href="/recent"
+            className="text-[13px] text-[#666] hover:text-[#e0e0e0] transition-colors px-[10px] py-[6px]"
+          >
+            Recent
+          </a>
           {data && !data.loading && (
             <button
               onClick={handleRefresh}

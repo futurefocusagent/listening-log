@@ -650,6 +650,71 @@ app.get('/api/albumart', async (req, res) => {
   }
 })
 
+// ==================== RECENT ALBUMS ====================
+
+interface RecentAlbumEntry {
+  album: string
+  artist: string
+  totalTracks: number
+  listenedTracks: string[]
+  allTracks: string[]
+  listenedCount: number
+  percentage: number
+  complete: boolean
+  imageUrl?: string
+  spotifyId?: string
+  releaseYear?: number
+  tier?: 'top' | 'mid' | 'low' | 'hidden' | 'bookmarked'
+  energy?: 'ambient' | 'moderate' | 'intense'
+  tags?: string[]
+  lastListenedAt: string
+}
+
+let recentCache: { data: RecentAlbumEntry[]; ts: number } | null = null
+const RECENT_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+
+app.get('/api/recent', async (_req, res) => {
+  if (recentCache && Date.now() - recentCache.ts < RECENT_CACHE_TTL) {
+    return res.json(recentCache.data)
+  }
+
+  try {
+    const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60
+    const tracks = await getAllTracks(LASTFM_USER, thirtyDaysAgo)
+
+    // Group by album key, track most recent listen date per album
+    const albumMap = new Map<string, string>() // key -> lastListenedAt
+    for (const t of tracks) {
+      if (!t.playedAt) continue
+      const key = `${t.artist.toLowerCase()}|||${t.album.toLowerCase()}`
+      const existing = albumMap.get(key)
+      if (!existing || t.playedAt > existing) {
+        albumMap.set(key, t.playedAt)
+      }
+    }
+
+    // Join with state.stats to get full album info
+    const recent: RecentAlbumEntry[] = []
+    for (const [key, lastListenedAt] of albumMap) {
+      const stat = state.stats.find(
+        s => `${s.artist.toLowerCase()}|||${s.album.toLowerCase()}` === key
+      )
+      if (stat) {
+        recent.push({ ...stat, lastListenedAt })
+      }
+    }
+
+    // Sort newest listen first
+    recent.sort((a, b) => b.lastListenedAt.localeCompare(a.lastListenedAt))
+
+    recentCache = { data: recent, ts: Date.now() }
+    res.json(recent)
+  } catch (err) {
+    console.error('/api/recent error:', err)
+    res.status(500).json({ error: 'Failed to fetch recent albums' })
+  }
+})
+
 app.post('/api/refresh', (_req, res) => {
   doRefresh(true)
   res.json({ ok: true })
