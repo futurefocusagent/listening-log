@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import AlbumModal from './AlbumModal'
 import { AlbumStat } from './App'
+import { useAlbumModal } from './useAlbumModal'
 
 interface RecentAlbum extends AlbumStat {
   lastListenedAt: string
@@ -23,7 +24,7 @@ export default function RecentPage() {
   const [albums, setAlbums] = useState<RecentAlbum[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedAlbum, setSelectedAlbum] = useState<AlbumStat | null>(null)
+  const [selectedAlbum, setSelectedAlbum] = useAlbumModal(albums)
 
   useEffect(() => {
     fetch('/api/recent')

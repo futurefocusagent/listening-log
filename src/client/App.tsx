@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import Timeline from './Timeline'
 import AlbumModal from './AlbumModal'
+import { useAlbumModal } from './useAlbumModal'
 
 export interface AlbumStat {
   album: string
@@ -37,7 +38,7 @@ export default function App() {
   const [data, setData] = useState<ApiResponse | null>(null)
   const [search, setSearch] = useState('')
   const [refreshing, setRefreshing] = useState(false)
-  const [selectedAlbum, setSelectedAlbum] = useState<AlbumStat | null>(null)
+  const [selectedAlbum, setSelectedAlbum] = useAlbumModal(data?.stats ?? [])
   const [showHidden, setShowHidden] = useState(false)
   const [showUncategorized, setShowUncategorized] = useState(false)
 
