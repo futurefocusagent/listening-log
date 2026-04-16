@@ -2,7 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import path from 'path'
 import { getAllTracks, AlbumStat, getAlbumTopTags, getArtistTopTags } from './lastfm.js'
-import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata, getAllTags, createTag, renameTag, deleteTag, addTagToAlbum, removeTagFromAlbum, getOrCreateTag, updateAlbumCategorization, getSetting, setSetting } from './db.js'
+import { initDb, saveStats, loadStats, updateAlbumMetadata, getAlbumsMissingMetadata, getAllTags, createTag, renameTag, deleteTag, addTagToAlbum, removeTagFromAlbum, getOrCreateTag, updateAlbumCategorization, getSetting, setSetting, getBookmarks } from './db.js'
 import { searchAlbum as spotifySearchAlbum, SpotifyAlbumInfo } from './spotify.js'
 import { getMbAlbumTags } from './musicbrainz.js'
 import { initLoggerDb, startSyncLog, updateSyncLog, logError, finishSyncLog, getRecentSyncLogs, getUnacknowledgedAlerts, acknowledgeAlert, acknowledgeAllAlerts } from './logger.js'
@@ -712,6 +712,16 @@ app.get('/api/recent', async (_req, res) => {
   } catch (err) {
     console.error('/api/recent error:', err)
     res.status(500).json({ error: 'Failed to fetch recent albums' })
+  }
+})
+
+app.get('/api/bookmarks', async (_req, res) => {
+  try {
+    const bookmarks = await getBookmarks()
+    res.json(bookmarks)
+  } catch (err) {
+    console.error('/api/bookmarks error:', err)
+    res.status(500).json({ error: 'Failed to fetch bookmarks' })
   }
 })
 

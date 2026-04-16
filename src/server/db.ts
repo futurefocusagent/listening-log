@@ -56,6 +56,7 @@ export async function initDb() {
   await pool.query(`ALTER TABLE album_stats DROP CONSTRAINT IF EXISTS album_stats_tier_check`)
   await pool.query(`ALTER TABLE album_stats ADD CONSTRAINT album_stats_tier_check CHECK (tier IN ('top', 'mid', 'low', 'hidden', 'bookmarked'))`)
   await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS energy TEXT CHECK (energy IN ('ambient', 'moderate', 'intense'))`)
+  await pool.query(`ALTER TABLE album_stats ADD COLUMN IF NOT EXISTS tier_changed_at TIMESTAMP`)
   console.log('DB initialized')
 }
 
@@ -157,7 +158,7 @@ export async function loadStats(): Promise<{
       listened_tracks: string[]; listened_count: number;
       percentage: number; complete: boolean; image_url: string | null;
       release_year: number | null; spotify_id: string | null;
-      tier: string | null; energy: string | null;
+      tier: string | null; energy: string | null; tier_changed_at: Date | null;
     }>(`SELECT * FROM album_stats ORDER BY complete ASC, percentage DESC`),
     pool.query<{ key: string; value: string }>(`SELECT * FROM sync_meta`),
     pool.query<{ artist: string; album: string; tag_name: string }>(
@@ -193,10 +194,57 @@ export async function loadStats(): Promise<{
       tier: r.tier as 'top' | 'mid' | 'low' | 'hidden' | 'bookmarked' | undefined ?? undefined,
       energy: r.energy as 'ambient' | 'moderate' | 'intense' | undefined ?? undefined,
       tags: tagMap.get(`${r.artist}|||${r.album}`) ?? [],
+      tierChangedAt: r.tier_changed_at ? r.tier_changed_at.toISOString() : undefined,
     })),
     totalTracks: parseInt(meta.total_tracks || '0', 10),
     fetchedAt: meta.last_sync || null,
   }
+}
+
+// ==================== BOOKMARKS ====================
+
+export async function getBookmarks(): Promise<AlbumStat[]> {
+  const [statsResult, tagsResult] = await Promise.all([
+    pool.query<{
+      artist: string; album: string; total_tracks: number;
+      listened_tracks: string[]; all_tracks: string[]; listened_count: number;
+      percentage: number; complete: boolean; image_url: string | null;
+      release_year: number | null; spotify_id: string | null;
+      tier: string | null; energy: string | null; tier_changed_at: Date | null;
+    }>(`SELECT * FROM album_stats WHERE tier = 'bookmarked' ORDER BY tier_changed_at DESC NULLS LAST`),
+    pool.query<{ artist: string; album: string; tag_name: string }>(
+      `SELECT at.artist, at.album, t.name as tag_name
+       FROM album_tags at JOIN tags t ON at.tag_id = t.id
+       WHERE (at.artist, at.album) IN (
+         SELECT artist, album FROM album_stats WHERE tier = 'bookmarked'
+       )`
+    )
+  ])
+
+  const tagMap = new Map<string, string[]>()
+  for (const row of tagsResult.rows) {
+    const key = `${row.artist}|||${row.album}`
+    if (!tagMap.has(key)) tagMap.set(key, [])
+    tagMap.get(key)!.push(row.tag_name)
+  }
+
+  return statsResult.rows.map(r => ({
+    artist: r.artist,
+    album: r.album,
+    totalTracks: r.total_tracks,
+    listenedTracks: r.listened_tracks,
+    allTracks: r.all_tracks ?? [],
+    listenedCount: r.listened_count,
+    percentage: r.percentage,
+    complete: r.complete,
+    imageUrl: r.image_url ?? undefined,
+    releaseYear: r.release_year ?? undefined,
+    spotifyId: r.spotify_id ?? undefined,
+    tier: r.tier as 'bookmarked',
+    energy: r.energy as 'ambient' | 'moderate' | 'intense' | undefined ?? undefined,
+    tags: tagMap.get(`${r.artist}|||${r.album}`) ?? [],
+    tierChangedAt: r.tier_changed_at ? r.tier_changed_at.toISOString() : undefined,
+  }))
 }
 
 // ==================== TAG MANAGEMENT ====================
@@ -286,6 +334,7 @@ export async function updateAlbumCategorization(
   if ('tier' in data) {
     sets.push(`tier = $${i++}`)
     values.push(data.tier ?? null)
+    sets.push(`tier_changed_at = CASE WHEN tier IS DISTINCT FROM $${i - 1} THEN NOW() ELSE tier_changed_at END`)
   }
   if ('energy' in data) {
     sets.push(`energy = $${i++}`)

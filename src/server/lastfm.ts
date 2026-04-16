@@ -23,6 +23,7 @@ export interface AlbumStat {
   tier?: 'top' | 'mid' | 'low' | 'hidden' | 'bookmarked'
   energy?: 'ambient' | 'moderate' | 'intense'
   tags?: string[]
+  tierChangedAt?: string
 }
 
 async function lfmGet(params: Record<string, string>): Promise<unknown> {

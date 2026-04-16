@@ -17,6 +17,7 @@ export interface AlbumStat {
   tier?: 'top' | 'mid' | 'low' | 'hidden' | 'bookmarked'
   energy?: 'ambient' | 'moderate' | 'intense'
   tags?: string[]
+  tierChangedAt?: string
 }
 
 export interface Tag {
@@ -88,6 +89,12 @@ export default function App() {
             className="text-[13px] text-[#666] hover:text-[#e0e0e0] transition-colors px-[10px] py-[6px]"
           >
             Recent
+          </a>
+          <a
+            href="/bookmarks"
+            className="text-[13px] text-[#666] hover:text-[#e0e0e0] transition-colors px-[10px] py-[6px]"
+          >
+            Bookmarks
           </a>
           {data && !data.loading && (
             <button
