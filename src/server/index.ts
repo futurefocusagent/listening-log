@@ -722,7 +722,7 @@ app.post('/api/refresh', (_req, res) => {
 
 const clientDist = path.join(__dirname, '../client')
 app.use(express.static(clientDist))
-app.get('*path', (_req, res) => {
+app.get('*', (_req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'), err => {
     if (err) res.status(500).send('Client not found')
   })
