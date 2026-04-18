@@ -93,7 +93,7 @@ export default function Layout({ children }: LayoutProps) {
                 <div className="text-[11px] text-[#666] truncate leading-tight">{track.artist}</div>
               </div>
               {track.duration > 0 && (
-                <div className="w-16 h-px bg-[#2a2a2a] shrink-0">
+                <div className="flex-1 h-1 bg-[#2a2a2a] min-w-[100px]">
                   <div className="h-full bg-[#1db954]" style={{ width: `${pct}%` }} />
                 </div>
               )}
