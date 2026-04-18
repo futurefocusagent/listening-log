@@ -17,7 +17,7 @@ interface LayoutProps {
 }
 
 const NAV_LINKS = [
-  { label: 'Top List', href: '/' },
+  { label: 'TopList', href: '/' },
   { label: 'Recent', href: '/recent' },
   { label: 'Bookmarks', href: '/bookmarks' },
 ]
@@ -68,20 +68,21 @@ export default function Layout({ children }: LayoutProps) {
       <header className="border-b border-[#2a2a2a] bg-[#111] sticky top-0 z-40">
         <div className="max-w-[960px] mx-auto px-4 py-3 flex items-center justify-between gap-4">
           {/* Brand */}
-          <div className="flex items-baseline gap-2 shrink-0">
-            <span className="text-[17px] font-bold text-[#e0e0e0]">Listening Log</span>
-            <span className="text-[12px] text-[#444]">boytunewonder</span>
+          <div className="flex items-center shrink-0">
+            <img src="/favicon.svg" alt="Listening Log" className="w-8 h-8" />
           </div>
 
           {/* Now Playing — compact inline */}
           {track && (
-            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+            <div
+              className={`flex items-center gap-2 flex-1 min-w-0 overflow-hidden ${matchedAlbum ? 'cursor-pointer' : 'cursor-default'}`}
+              onClick={matchedAlbum ? () => setSelectedAlbum(matchedAlbum) : undefined}
+            >
               {track.albumArt && (
                 <img
                   src={track.albumArt}
                   alt=""
-                  onClick={matchedAlbum ? () => setSelectedAlbum(matchedAlbum) : undefined}
-                  className={`w-9 h-9 shrink-0 object-cover block ${matchedAlbum ? 'cursor-pointer' : 'cursor-default'}`}
+                  className="w-9 h-9 shrink-0 object-cover block"
                 />
               )}
               <div className="flex-1 min-w-0">

@@ -63,26 +63,8 @@ export default function App() {
 
   const searchActive = search.trim().length > 0
 
-  const incompleteCount = data?.stats.filter(a => !a.complete).length ?? 0
-  const completeCount = data?.stats.filter(a => a.complete).length ?? 0
-
   return (
     <div className="max-w-[960px] mx-auto px-4 py-5">
-      {/* Stats bar */}
-      {data && !data.loading && (
-        <div className="flex gap-6 mb-6 bg-[#1a1a1a] px-[18px] py-3 flex-wrap items-center">
-          <Stat label="Total scrobbles" value={data.totalTracks.toLocaleString()} />
-          <Stat label="Albums tracked" value={data.stats.length.toString()} />
-          <Stat label="Need finishing" value={incompleteCount.toString()} color="#f59e0b" />
-          <Stat label="Complete" value={completeCount.toString()} color="#22c55e" />
-          {data.fetchedAt && (
-            <span className="text-xs text-[#444] ml-auto">
-              Updated {new Date(data.fetchedAt).toLocaleTimeString()}
-            </span>
-          )}
-        </div>
-      )}
-
       {/* Error state */}
       {data?.status === 'error' && (
         <div className="bg-[#1a1a1a] border border-[#3a1a1a] p-6 text-center mb-6 text-[#f87171]">
@@ -196,11 +178,3 @@ export default function App() {
   )
 }
 
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div>
-      <div className="text-lg font-bold" style={{ color: color || '#e0e0e0' }}>{value}</div>
-      <div className="text-xs text-[#555]">{label}</div>
-    </div>
-  )
-}
