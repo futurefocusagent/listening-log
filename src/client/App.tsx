@@ -38,7 +38,6 @@ interface ApiResponse {
 export default function App() {
   const [data, setData] = useState<ApiResponse | null>(null)
   const [search, setSearch] = useState('')
-  const [refreshing, setRefreshing] = useState(false)
   const [selectedAlbum, setSelectedAlbum] = useAlbumModal(data?.stats ?? [])
   const [showHidden, setShowHidden] = useState(false)
   const [showUncategorized, setShowUncategorized] = useState(false)
@@ -62,52 +61,13 @@ export default function App() {
     return () => clearInterval(interval)
   }, [data?.loading])
 
-  const handleRefresh = async () => {
-    setRefreshing(true)
-    await fetch('/api/refresh')
-    const res = await fetch('/api/stats')
-    setData(await res.json())
-    setRefreshing(false)
-  }
-
   const searchActive = search.trim().length > 0
 
   const incompleteCount = data?.stats.filter(a => !a.complete).length ?? 0
   const completeCount = data?.stats.filter(a => a.complete).length ?? 0
 
   return (
-    <div className="max-w-[960px] mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="mb-7 flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-[26px] font-bold mb-1">🎵 Listening Log</h1>
-          <p className="text-[#666] text-[13px]">boytunewonder · album completion tracker</p>
-        </div>
-        <div className="flex gap-2 items-center">
-          <a
-            href="/recent"
-            className="text-[13px] text-[#666] hover:text-[#e0e0e0] transition-colors px-[10px] py-[6px]"
-          >
-            Recent
-          </a>
-          <a
-            href="/bookmarks"
-            className="text-[13px] text-[#666] hover:text-[#e0e0e0] transition-colors px-[10px] py-[6px]"
-          >
-            Bookmarks
-          </a>
-          {data && !data.loading && (
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="bg-[#1a1a1a] border border-[#333] text-[#666] px-[10px] py-[6px] cursor-pointer text-[13px]"
-            >
-              {refreshing ? '…' : '↻'}
-            </button>
-          )}
-        </div>
-      </div>
-
+    <div className="max-w-[960px] mx-auto px-4 py-5">
       {/* Stats bar */}
       {data && !data.loading && (
         <div className="flex gap-6 mb-6 bg-[#1a1a1a] px-[18px] py-3 flex-wrap items-center">
@@ -153,11 +113,6 @@ export default function App() {
       {/* Initial loading */}
       {!data && (
         <div className="text-center text-[#555] p-[60px]">Loading…</div>
-      )}
-
-      {/* Now Playing */}
-      {data && !data.loading && (
-        <NowPlaying albums={data.stats} onAlbumClick={setSelectedAlbum} />
       )}
 
       {/* Search */}
@@ -222,13 +177,12 @@ export default function App() {
           onNavigate={setSelectedAlbum}
           onClose={() => setSelectedAlbum(null)}
           onUpdate={(updated) => {
-            // Update both the selected album and the data array
             setSelectedAlbum(prev => prev ? { ...prev, ...updated } : null)
             setData(prev => {
               if (!prev) return prev
               return {
                 ...prev,
-                stats: prev.stats.map(s => 
+                stats: prev.stats.map(s =>
                   s.artist === selectedAlbum.artist && s.album === selectedAlbum.album
                     ? { ...s, ...updated }
                     : s
@@ -250,76 +204,3 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
     </div>
   )
 }
-
-interface NowPlayingTrack {
-  name: string
-  artist: string
-  album: string
-  albumArt: string | null
-  progress: number
-  duration: number
-}
-
-interface NowPlayingProps {
-  albums: AlbumStat[]
-  onAlbumClick: (album: AlbumStat) => void
-}
-
-function NowPlaying({ albums, onAlbumClick }: NowPlayingProps) {
-  const [track, setTrack] = useState<NowPlayingTrack | null>(null)
-
-  useEffect(() => {
-    const poll = () => {
-      fetch('/api/now-playing')
-        .then(r => r.json())
-        .then((d: { playing: boolean; track?: NowPlayingTrack }) => {
-          setTrack(d.playing && d.track ? d.track : null)
-        })
-        .catch(() => {})
-    }
-    poll()
-    const interval = setInterval(poll, 15000)
-    return () => clearInterval(interval)
-  }, [])
-
-  if (!track) return null
-
-  const pct = track.duration > 0 ? Math.min(100, (track.progress / track.duration) * 100) : 0
-
-  const matchedAlbum = track
-    ? albums.find(a =>
-        a.artist.toLowerCase() === track.artist.toLowerCase() &&
-        a.album.toLowerCase() === track.album.toLowerCase()
-      )
-    : null
-
-  return (
-    <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-3 mb-5 flex flex-row items-center gap-3">
-      {track.albumArt && (
-        <img
-          src={track.albumArt}
-          alt=""
-          onClick={matchedAlbum ? () => onAlbumClick(matchedAlbum) : undefined}
-          className={`w-[110px] h-[110px] shrink-0 object-cover block ${matchedAlbum ? 'cursor-pointer' : 'cursor-default'}`}
-        />
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="text-[10px] text-[#1db954] tracking-[0.08em] font-semibold mb-0.5">
-          NOW PLAYING
-        </div>
-        <div className="text-sm font-semibold text-[#e0e0e0] truncate">
-          {track.name}
-        </div>
-        <div className="text-xs text-[#888] truncate">
-          {track.artist}{matchedAlbum?.releaseYear ? ` · ${matchedAlbum.releaseYear}` : ''}
-        </div>
-        {track.duration > 0 && (
-          <div className="mt-1.5 h-0.5 bg-[#2a2a2a]">
-            <div className="h-full bg-[#1db954]" style={{ width: `${pct}%` }} />
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-

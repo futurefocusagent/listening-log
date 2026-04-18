@@ -51,19 +51,10 @@ export default function RecentPage() {
   }, [])
 
   return (
-    <div className="max-w-[720px] mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="mb-7 flex items-center justify-between">
-        <div>
-          <h1 className="text-[26px] font-bold mb-1">Recent Listens</h1>
-          <p className="text-[#666] text-[13px]">Albums played in the last 30 days</p>
-        </div>
-        <a
-          href="/"
-          className="text-[13px] text-[#666] hover:text-[#e0e0e0] transition-colors"
-        >
-          ← All albums
-        </a>
+    <div className="max-w-[720px] mx-auto px-4 py-5">
+      <div className="mb-6">
+        <h1 className="text-[20px] font-bold mb-0.5">Recent Listens</h1>
+        <p className="text-[#666] text-[13px]">Albums played in the last 30 days</p>
       </div>
 
       {loading && (
