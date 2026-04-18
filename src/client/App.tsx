@@ -65,36 +65,20 @@ export default function App() {
 
   return (
     <div className="max-w-[960px] mx-auto px-4 py-5">
-      {/* Error state */}
-      {data?.status === 'error' && (
-        <div className="bg-[#1a1a1a] border border-[#3a1a1a] p-6 text-center mb-6 text-[#f87171]">
-          <div className="text-2xl mb-2">⚠️</div>
-          <p className="font-semibold">Something went wrong</p>
-          <p className="text-[13px] mt-1 text-[#888]">
-            {data.progress || 'Database unavailable. Please try again later.'}
-          </p>
-        </div>
+      {/* Initial loading - only show when no data at all */}
+      {!data && (
+        <div className="text-center text-[#555] p-[60px]">Loading…</div>
       )}
 
-      {/* Loading state */}
-      {data?.loading && (
+      {/* Loading state - only during initial fetch when no albums yet */}
+      {data?.loading && data.stats.length === 0 && (
         <div className="bg-[#1a1a1a] p-6 text-center mb-6 text-[#888]">
           <div className="text-2xl mb-2">⏳</div>
           <p>Building your listening history…</p>
           <p className="text-[13px] mt-1 text-[#555]">
             Fetching from Last.fm — this only happens once
           </p>
-          {data.stats.length > 0 && (
-            <p className="text-[13px] mt-2 text-[#666]">
-              {data.stats.length} albums found so far…
-            </p>
-          )}
         </div>
-      )}
-
-      {/* Initial loading */}
-      {!data && (
-        <div className="text-center text-[#555] p-[60px]">Loading…</div>
       )}
 
       {/* Search */}
