@@ -765,6 +765,67 @@ app.get('/api/bookmarks', async (_req, res) => {
   }
 })
 
+// ==================== AUTO-PLAY BOOKMARKS ====================
+
+app.get('/api/bookmarks-queue', async (_req, res) => {
+  try {
+    const bookmarks = await getBookmarks()
+    res.json(bookmarks)
+  } catch (err) {
+    console.error('/api/bookmarks-queue error:', err)
+    res.status(500).json({ error: 'Failed to fetch bookmarks queue' })
+  }
+})
+
+app.post('/api/auto-play/next', async (req, res) => {
+  const { currentAlbumId } = req.body as { currentAlbumId?: string }
+
+  try {
+    const bookmarks = await getBookmarks()
+    if (bookmarks.length === 0) {
+      return res.status(404).json({ error: 'No bookmarked albums' })
+    }
+
+    let nextAlbum = bookmarks[0]
+
+    if (currentAlbumId) {
+      const currentIndex = bookmarks.findIndex(b => b.spotifyId === currentAlbumId)
+      if (currentIndex !== -1 && currentIndex + 1 < bookmarks.length) {
+        nextAlbum = bookmarks[currentIndex + 1]
+      }
+      // If current is last or not found, wrap to first
+    }
+
+    if (!nextAlbum.spotifyId) {
+      return res.status(422).json({ error: 'Next album has no Spotify ID' })
+    }
+
+    const accessToken = await getSpotifyAccessToken()
+    if (!accessToken) return res.status(401).json({ error: 'Spotify not connected' })
+
+    const playRes = await fetch('https://api.spotify.com/v1/me/player/play', {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ context_uri: `spotify:album:${nextAlbum.spotifyId}` }),
+    })
+
+    if (playRes.status === 404) {
+      return res.status(404).json({ error: 'No active Spotify device found. Open Spotify on a device first.' })
+    }
+    if (!playRes.ok && playRes.status !== 204) {
+      return res.status(playRes.status).json({ error: 'Spotify playback failed' })
+    }
+
+    res.json({ ok: true, album: nextAlbum })
+  } catch (err) {
+    console.error('/api/auto-play/next error:', err)
+    res.status(500).json({ error: 'Internal error' })
+  }
+})
+
 app.post('/api/refresh', (_req, res) => {
   doRefresh(true)
   res.json({ ok: true })
